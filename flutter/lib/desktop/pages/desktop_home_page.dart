@@ -409,17 +409,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget _buildScreenWallPage(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.grid_view_outlined, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text('屏幕墙功能即将上线',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-        ],
-      ),
-    );
+    return const _JilianScreenWallPage();
   }
 
   buildIDBoard(BuildContext context) {
@@ -968,6 +958,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     });
     Get.put<RxBool>(svcStopped, tag: 'stop-service');
+    // 极连自定义客户端：默认开启「被控需输入访问密码」，类 ToDesk 安全策略
+    if (isCustomClient) {
+      final cur = bind.mainGetOptionSync(key: 'approve-mode');
+      if (cur.isEmpty) {
+        bind.mainSetOption(key: 'approve-mode', value: 'password');
+      }
+    }
     rustDeskWinManager.registerActiveWindowListener(onActiveWindowChanged);
 
     screenToMap(window_size.Screen screen) => {
@@ -3979,6 +3976,261 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
           ),
           // 右侧品牌面板
           _buildBrandPanel(),
+        ],
+      ),
+    );
+  }
+}
+
+/// 极连远程：屏幕墙（监控墙）——在一个界面展示多台电脑的实时画面入口。
+/// 仅展示电脑设备（排除手机端），点击「实时查看」打开该设备的实时画面。
+class _JilianScreenWallPage extends StatefulWidget {
+  const _JilianScreenWallPage({Key? key}) : super(key: key);
+
+  @override
+  State<_JilianScreenWallPage> createState() => _JilianScreenWallPageState();
+}
+
+class _JilianScreenWallPageState extends State<_JilianScreenWallPage> {
+  List<JilianDevice> _devices = [];
+  bool _loading = false;
+  String? _error;
+  final Map<String, bool> _onlineStates = {};
+  Timer? _onlineTimer;
+  static const _onlineEvent = 'callback_query_onlines';
+  static const _onlineHandlerKey = 'jilian_screen_wall';
+
+  @override
+  void initState() {
+    super.initState();
+    platformFFI.registerEventHandler(_onlineEvent, _onlineHandlerKey, (evt) {
+      _onOnlineEvent(evt);
+    });
+    _loadDevices();
+    jilianApi.loginState.listen((_) {
+      if (mounted) _loadDevices();
+    });
+  }
+
+  @override
+  void dispose() {
+    _onlineTimer?.cancel();
+    platformFFI.unregisterEventHandler(_onlineEvent, _onlineHandlerKey);
+    super.dispose();
+  }
+
+  void _onOnlineEvent(Map<String, dynamic> evt) {
+    final onlines = (evt['onlines'] as String? ?? '')
+        .split(',')
+        .where((s) => s.isNotEmpty);
+    final offlines = (evt['offlines'] as String? ?? '')
+        .split(',')
+        .where((s) => s.isNotEmpty);
+    if (mounted) {
+      setState(() {
+        for (final id in onlines) _onlineStates[id] = true;
+        for (final id in offlines) _onlineStates[id] = false;
+      });
+    }
+  }
+
+  Future<void> _queryOnlineStates() async {
+    final localId = trimID(gFFI.serverModel.serverId.text);
+    final ids = <String>{};
+    for (final d in _devices) {
+      final id = trimID(d.deviceId);
+      if (id.isNotEmpty && id != localId) ids.add(id);
+    }
+    if (ids.isNotEmpty) {
+      try {
+        await bind.queryOnlines(ids: ids.toList(growable: false));
+      } catch (e) {
+        debugPrint('screen wall queryOnlines error: $e');
+      }
+    }
+  }
+
+  Future<void> _loadDevices() async {
+    if (!jilianApi.isLoggedIn) {
+      if (mounted) {
+        setState(() {
+          _devices = [];
+          _loading = false;
+        });
+      }
+      return;
+    }
+    if (mounted) setState(() => _loading = true);
+    try {
+      final list = await jilianApi.getDeviceList();
+      if (mounted) {
+        setState(() {
+          _devices = list;
+          _loading = false;
+          _error = null;
+        });
+      }
+      _queryOnlineStates();
+      _onlineTimer?.cancel();
+      _onlineTimer =
+          Timer.periodic(const Duration(seconds: 8), (_) => _queryOnlineStates());
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = '加载失败：$e';
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  IconData _platformIcon(String? platform) {
+    switch ((platform ?? '').toLowerCase()) {
+      case 'windows':
+        return Icons.desktop_windows;
+      case 'macos':
+      case 'mac':
+        return Icons.laptop_mac;
+      case 'linux':
+        return Icons.computer;
+      case 'android':
+        return Icons.phone_android;
+      case 'ios':
+        return Icons.phone_iphone;
+      default:
+        return Icons.device_unknown;
+    }
+  }
+
+  bool _isMobile(String? platform) {
+    final p = (platform ?? '').toLowerCase();
+    return p == 'android' || p == 'ios';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!jilianApi.isLoggedIn) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.grid_view_outlined,
+                size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text('请先登录极连账号以使用屏幕墙',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    final localId = trimID(gFFI.serverModel.serverId.text);
+    // 仅展示电脑设备（排除手机端），本机也排除
+    final computers = _devices.where((d) {
+      final id = trimID(d.deviceId);
+      return id != localId && !_isMobile(d.platform);
+    }).toList();
+
+    if (_loading && computers.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (computers.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.grid_view_outlined,
+                size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text('暂无可监控的电脑设备',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+            const SizedBox(height: 8),
+            Text('在「设备列表」中添加电脑后，这里会显示其实时画面入口',
+                style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text('屏幕墙 · 监控 ${computers.length} 台电脑',
+                style: Theme.of(context).textTheme.titleMedium),
+          ),
+          Expanded(
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 300,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.5,
+              ),
+              itemCount: computers.length,
+              itemBuilder: (context, index) {
+                final d = computers[index];
+                final id = trimID(d.deviceId);
+                final online = _onlineStates[id] ?? (d.isOnline == 1);
+                final name = d.deviceName.isNotEmpty
+                    ? d.deviceName
+                    : (d.deviceAlias.isNotEmpty ? d.deviceAlias : id);
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: Theme.of(context)
+                            .dividerColor
+                            .withOpacity(0.5)),
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(_platformIcon(d.platform),
+                              size: 22, color: MyTheme.accent),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(name,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 14),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                          Container(
+                            width: 9,
+                            height: 9,
+                            decoration: BoxDecoration(
+                              color: online ? Colors.green : Colors.grey,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(id,
+                          style:
+                              const TextStyle(color: Colors.grey, fontSize: 12)),
+                      const Spacer(),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: online ? () => connect(context, id) : null,
+                          icon: const Icon(Icons.visibility, size: 16),
+                          label: Text(online ? '实时查看' : '离线'),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
