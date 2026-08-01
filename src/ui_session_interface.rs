@@ -569,6 +569,11 @@ impl<T: InvokeUiSession> Session<T> {
         self.send(Data::Message(msg));
     }
 
+    pub fn shutdown_remote_device(&self) {
+        let msg = self.lc.read().unwrap().shutdown_remote_device();
+        self.send(Data::Message(msg));
+    }
+
     #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pub fn send_plugin_request(&self, request: PluginRequest) {

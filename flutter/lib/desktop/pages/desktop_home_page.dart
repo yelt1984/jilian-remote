@@ -2465,21 +2465,15 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
         ]),
         content: Text(
           type == 'shutdown'
-              ? '当前版本暂未实现「远程一键关机」，将打开 "$name" 的远程桌面，请在系统内通过开始菜单关机。'
+              ? '即将对 "$name" 执行关机。\n\n连接成功后会自动执行，无需再点任何工具栏按钮。'
               : '即将对 "$name" 执行$action。\n\n连接成功后会自动执行，无需再点任何工具栏按钮。',
         ),
         actions: [
           dialogButton('取消', onPressed: close, isOutline: true),
-          dialogButton(type == 'shutdown' ? '打开远程桌面' : '确认$action',
-              onPressed: () {
+          dialogButton('确认$action', onPressed: () {
             close();
-            if (type == 'shutdown') {
-              connect(context, id);
-              showToast('请在远程窗口中通过开始菜单关机');
-            } else {
-              showToast('正在连接 $name 并执行$action...');
-              connect(context, id, autoPowerAction: type);
-            }
+            showToast('正在连接 $name 并执行$action...');
+            connect(context, id, autoPowerAction: type);
           }),
         ],
       );

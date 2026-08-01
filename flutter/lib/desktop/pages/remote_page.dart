@@ -209,6 +209,10 @@ class _RemotePageState extends State<RemotePage>
         bind.sessionRestartRemoteDevice(sessionId: _ffi.sessionId);
         showToast('已向远程设备发送重启指令');
         break;
+      case 'shutdown':
+        bind.sessionShutdownRemoteDevice(sessionId: _ffi.sessionId);
+        showToast('已向远程设备发送关机指令');
+        break;
       default:
         break;
     }
