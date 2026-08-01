@@ -284,8 +284,10 @@ void runConnectionManagerScreen() async {
     MyTheme.currentThemeMode(),
   );
   final hide = await bind.cmGetConfig(name: "hide_cm") == 'true';
-  gFFI.serverModel.hideCm = hide;
-  if (hide) {
+  // 极连自定义客户端：连接管理窗口默认隐藏，避免单独窗口冗余
+  final shouldHide = hide || isCustomClient;
+  gFFI.serverModel.hideCm = shouldHide;
+  if (shouldHide) {
     await hideCmWindow(isStartup: true);
   } else {
     await showCmWindow(isStartup: true);
