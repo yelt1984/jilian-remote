@@ -95,6 +95,11 @@ class _RemotePageState extends State<RemotePage>
 
   late FFI _ffi;
 
+  // 远程电源一键直达：防止重复执行 / 超时无响应
+  bool _autoPowerActionExecuted = false;
+  Timer? _autoPowerFallbackTimer;
+  Timer? _autoPowerTimeoutTimer;
+
   SessionID get sessionId => _ffi.sessionId;
 
   _RemotePageState(String id) {
@@ -118,11 +123,11 @@ class _RemotePageState extends State<RemotePage>
           _ffi.ffiModel.pi.platform, _ffi.dialogManager);
       _ffi.recordingModel
           .updateStatus(bind.sessionGetIsRecording(sessionId: _ffi.sessionId));
-      // 远程电源一键直达：会话连上(首帧到达)后自动执行锁屏/重启，避免二次点击工具栏
+      // 远程电源一键直达：首帧到达后立即执行，取消兜底定时器
       if (widget.autoPowerAction != null) {
-        Future.delayed(const Duration(milliseconds: 1200), () {
-          _doAutoPowerAction(widget.autoPowerAction!);
-        });
+        _autoPowerFallbackTimer?.cancel();
+        _autoPowerTimeoutTimer?.cancel();
+        _doAutoPowerAction(widget.autoPowerAction!);
       }
     });
     _ffi.start(
@@ -135,6 +140,20 @@ class _RemotePageState extends State<RemotePage>
       display: widget.display,
       displays: widget.displays,
     );
+
+    // 远程电源一键直达：6s 兜底（即使首帧没来也尝试执行），15s 超时提示
+    if (widget.autoPowerAction != null) {
+      _autoPowerFallbackTimer = Timer(const Duration(seconds: 6), () {
+        if (!_autoPowerActionExecuted) {
+          _doAutoPowerAction(widget.autoPowerAction!);
+        }
+      });
+      _autoPowerTimeoutTimer = Timer(const Duration(seconds: 15), () {
+        if (!_autoPowerActionExecuted) {
+          showToast('远程设备未响应，$widget.id 可能离线或需要密码');
+        }
+      });
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
       _ffi.dialogManager
@@ -175,14 +194,20 @@ class _RemotePageState extends State<RemotePage>
     });
   }
 
-  /// 远程电源一键直达：会话建立(首帧到达)后由首页电源按钮触发，无需再点工具栏
+  /// 远程电源一键直达：由首页电源按钮触发，无需再点工具栏
   void _doAutoPowerAction(String action) {
+    if (_autoPowerActionExecuted) return;
+    _autoPowerActionExecuted = true;
+    _autoPowerFallbackTimer?.cancel();
+    _autoPowerTimeoutTimer?.cancel();
     switch (action) {
       case 'lock':
         bind.sessionLockScreen(sessionId: _ffi.sessionId);
+        showToast('已向远程设备发送锁屏指令');
         break;
       case 'restart':
         bind.sessionRestartRemoteDevice(sessionId: _ffi.sessionId);
+        showToast('已向远程设备发送重启指令');
         break;
       default:
         break;
@@ -279,6 +304,8 @@ class _RemotePageState extends State<RemotePage>
     _rawKeyFocusNode.dispose();
     await _ffi.close(closeSession: closeSession);
     _timer?.cancel();
+    _autoPowerFallbackTimer?.cancel();
+    _autoPowerTimeoutTimer?.cancel();
     _ffi.dialogManager.dismissAll();
     if (closeSession) {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,

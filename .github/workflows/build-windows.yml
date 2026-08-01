@@ -27,7 +27,7 @@ jobs:
   build-RustDeskTempTopMostWindow:
     uses: ./.github/workflows/third-party-RustDeskTempTopMostWindow.yml
     with:
-      upload-artifact: ${{ inputs.upload-artifact }}
+      upload-artifact: true
       target: windows-2022
       configuration: Release
       platform: x64
@@ -210,7 +210,7 @@ jobs:
       - name: Download RustDeskTempTopMostWindow artifacts
         uses: actions/download-artifact@master
         with:
-          name: topmostwindow-artifacts
+          name: topmostwindow-artifacts-x64
           path: "./rustdesk"
 
       - name: Upload build output

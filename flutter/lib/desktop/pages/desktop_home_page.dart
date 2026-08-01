@@ -2314,52 +2314,44 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     );
   }
 
-  /// 远程设备详情面板：按 ToDesk 风格分块排列
+  /// 远程设备详情面板：按 ToDesk 风格分块排列（4 列紧凑网格）
   Widget _buildRemoteDetailPanel(BuildContext context, String id, String name) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader('基础连接'),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 14,
-          runSpacing: 14,
-          children: [
-            _buildBigAction(Icons.desktop_windows, '远程控制',
-                MyTheme.accent, () => connect(context, id)),
-            _buildBigAction(Icons.folder_copy, '文件传输', Colors.blueGrey,
-                () => connect(context, id, isFileTransfer: true)),
-            _buildBigAction(Icons.terminal, '终端', Colors.blueGrey,
-                () => _showTerminalNotice(context)),
-            _buildBigAction(Icons.visibility, '观看模式', Colors.blueGrey,
-                () => connect(context, id)),
-            _buildBigAction(Icons.people_alt, '协作模式', Colors.blueGrey,
-                () => connect(context, id)),
-            _buildBigAction(Icons.videocam, '摄像头', Colors.blueGrey,
-                () {
-              showToast('正在连接远程摄像头...');
-              connect(context, id, isViewCamera: true);
-            }),
-            _buildBigAction(Icons.fit_screen, '镜像屏', Colors.blueGrey,
-                () => _showMirrorScreenNotice(context)),
-            _buildBigAction(Icons.open_in_full, '扩展屏', Colors.blueGrey,
-                () => _showExtendScreenNotice(context)),
-          ],
-        ),
+        _buildActionGrid([
+          _buildBigAction(Icons.desktop_windows, '远程控制',
+              MyTheme.accent, () => connect(context, id)),
+          _buildBigAction(Icons.folder_copy, '文件传输', Colors.blueGrey,
+              () => connect(context, id, isFileTransfer: true)),
+          _buildBigAction(Icons.terminal, '终端', Colors.blueGrey,
+              () => _showTerminalNotice(context)),
+          _buildBigAction(Icons.visibility, '观看模式', Colors.blueGrey,
+              () => connect(context, id)),
+          _buildBigAction(Icons.people_alt, '协作模式', Colors.blueGrey,
+              () => connect(context, id)),
+          _buildBigAction(Icons.videocam, '摄像头', Colors.blueGrey,
+              () {
+            showToast('正在连接远程摄像头...');
+            connect(context, id, isViewCamera: true);
+          }),
+          _buildBigAction(Icons.fit_screen, '镜像屏', Colors.blueGrey,
+              () => _showMirrorScreenNotice(context)),
+          _buildBigAction(Icons.open_in_full, '扩展屏', Colors.blueGrey,
+              () => _showExtendScreenNotice(context)),
+        ]),
         const SizedBox(height: 24),
         _buildSectionHeader('辅助工具'),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 14,
-          runSpacing: 14,
-          children: [
-            _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
-                () => _openFileCenter(context, id)),
-            _buildBigAction(Icons.sports_esports, '游戏与应用中心',
-                Colors.deepOrange,
-                () => _showGameCenterNotice(context)),
-          ],
-        ),
+        _buildActionGrid([
+          _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
+              () => _openFileCenter(context, id)),
+          _buildBigAction(Icons.sports_esports, '游戏与应用中心',
+              Colors.deepOrange,
+              () => _showGameCenterNotice(context)),
+        ]),
         const SizedBox(height: 24),
         _buildSectionHeader('电源操作'),
         const SizedBox(height: 12),
@@ -2394,6 +2386,19 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           ],
         ),
       ],
+    );
+  }
+
+  /// 4 列操作按钮网格（按 ToDesk 风格紧凑排列）
+  Widget _buildActionGrid(List<Widget> children) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 0.9,
+      children: children,
     );
   }
 
@@ -2460,7 +2465,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
         ]),
         content: Text(
           type == 'shutdown'
-              ? 'RustDesk 开源核心未提供「远程一键关机」接口，无法直接对 "$name" 执行关机。\n\n请点击下方「打开远程桌面」，进入系统后通过开始菜单关机。'
+              ? '当前版本暂未实现「远程一键关机」，将打开 "$name" 的远程桌面，请在系统内通过开始菜单关机。'
               : '即将对 "$name" 执行$action。\n\n连接成功后会自动执行，无需再点任何工具栏按钮。',
         ),
         actions: [
@@ -2538,17 +2543,13 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
             const SizedBox(height: 24),
             _buildSectionHeader('辅助工具'),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 14,
-              runSpacing: 14,
-              children: [
-                _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
-                    () => _showFileCenterNotice(context)),
-                _buildBigAction(Icons.sports_esports, '游戏与应用中心',
-                    Colors.deepOrange,
-                    () => _showGameCenterNotice(context)),
-              ],
-            ),
+            _buildActionGrid([
+              _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
+                  () => _showFileCenterNotice(context)),
+              _buildBigAction(Icons.sports_esports, '游戏与应用中心',
+                  Colors.deepOrange,
+                  () => _showGameCenterNotice(context)),
+            ]),
             const SizedBox(height: 24),
             _buildSectionHeader('电源操作'),
             const SizedBox(height: 12),
