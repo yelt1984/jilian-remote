@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_hbb/mobile/pages/server_page.dart';
+import 'package:flutter_hbb/mobile/pages/jilian_app_center_page.dart';
+import 'package:flutter_hbb/mobile/pages/jilian_device_list_page.dart';
+import 'package:flutter_hbb/mobile/pages/jilian_my_page.dart';
 import 'package:flutter_hbb/mobile/pages/settings_page.dart';
 import 'package:flutter_hbb/web/settings_page.dart';
 import 'package:get/get.dart';
 import '../../common.dart';
-import '../../common/widgets/chat_page.dart';
 import '../../models/platform_model.dart';
 import '../../models/state_model.dart';
 import 'connection_page.dart';
@@ -48,15 +49,13 @@ class HomePageState extends State<HomePage> {
   void initPages() {
     _pages.clear();
     if (!bind.isIncomingOnly()) {
+      _pages.add(JilianDeviceListPage());
       _pages.add(ConnectionPage(
         appBarActions: [],
       ));
+      _pages.add(JilianAppCenterPage());
+      _pages.add(JilianMyPage());
     }
-    if (isAndroid && !bind.isOutgoingOnly()) {
-      _chatPageTabIndex = _pages.length;
-      _pages.addAll([ChatPage(type: ChatPageType.mobileMain), ServerPage()]);
-    }
-    _pages.add(SettingsPage());
   }
 
   @override
@@ -205,13 +204,13 @@ class WebHomePage extends StatelessWidget {
     }
     bool isFileTransfer = false;
     bool isViewCamera = false;
-    bool isTerminal = false;
     String? id;
     String? password;
     for (int i = 0; i < args.length; i++) {
       switch (args[i]) {
         case '--connect':
         case '--play':
+          isFileTransfer = false;
           id = args[i + 1];
           i++;
           break;
@@ -225,17 +224,6 @@ class WebHomePage extends StatelessWidget {
           id = args[i + 1];
           i++;
           break;
-        case '--terminal':
-          isTerminal = true;
-          id = args[i + 1];
-          i++;
-          break;
-        case '--terminal-admin':
-          setEnvTerminalAdmin();
-          isTerminal = true;
-          id = args[i + 1];
-          i++;
-          break;
         case '--password':
           password = args[i + 1];
           i++;
@@ -245,11 +233,7 @@ class WebHomePage extends StatelessWidget {
       }
     }
     if (id != null) {
-      connect(context, id, 
-        isFileTransfer: isFileTransfer, 
-        isViewCamera: isViewCamera, 
-        isTerminal: isTerminal,
-        password: password);
+      connect(context, id, isFileTransfer: isFileTransfer, isViewCamera: isViewCamera, password: password);
     }
   }
 }
