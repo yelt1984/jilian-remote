@@ -9075,7 +9075,7 @@ dependencies = [
 [[package]]
 name = "tray-icon"
 version = "0.21.3"
-source = "git+https://github.com/tauri-apps/tray-icon#0a5835b0e6828e37a1f781de9c2d671ae7a939e6"
+source = "git+https://github.com/tauri-apps/tray-icon?rev=0a5835b0e6828e37a1f781de9c2d671ae7a939e6#0a5835b0e6828e37a1f781de9c2d671ae7a939e6"
 dependencies = [
  "crossbeam-channel",
  "dirs 6.0.0",
