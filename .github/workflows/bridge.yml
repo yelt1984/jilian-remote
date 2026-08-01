@@ -37,8 +37,16 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          submodules: recursive
           fetch-depth: 0
+          submodules: false
+
+      - name: Checkout submodules (public, anonymous)
+        shell: bash
+        run: |
+          git config --global --unset-all http.https://github.com/.extraheader || true
+          git submodule foreach --recursive git config --local --unset-all 'http.https://github.com/.extraheader' || true
+          git submodule sync --recursive
+          git submodule update --init --recursive --force
 
       - name: Install prerequisites
         run: |
