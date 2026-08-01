@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/dialog.dart';
+
 import 'package:flutter_hbb/models/input_modifier_utils.dart';
 import 'package:flutter_hbb/models/model.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/terminal_model.dart';
 import 'package:flutter_hbb/mobile/terminal_keyboard_utils.dart';
+
 import 'package:google_fonts/google_fonts.dart';
 import 'package:xterm/xterm.dart';
 import '../../desktop/pages/terminal_connection_manager.dart';
@@ -45,11 +47,13 @@ class _TerminalPageState extends State<TerminalPage>
   final GlobalKey _keyboardKey = GlobalKey();
   double _keyboardHeight = 0;
   late bool _showTerminalExtraKeys;
+
   // Ctrl lock state for virtual keyboard: active key presses are mapped to control codes
   bool _ctrlLocked = false;
   bool _altLocked = false;
   // Row3 expand/collapse state for compact keyboard layout
   bool _row3Expanded = false;
+
   // For iOS edge swipe gesture
   double _swipeStartX = 0;
   double _swipeCurrentX = 0;
@@ -102,6 +106,7 @@ class _TerminalPageState extends State<TerminalPage>
     // terminal extra keys bar is unnecessary and disabled.
     _showTerminalExtraKeys = !isWebDesktop &&
         mainGetLocalBoolOptionSync(kOptionEnableShowTerminalExtraKeys);
+
     _terminalModel.isCtrlLocked = () => _ctrlLocked;
     _terminalModel.clearCtrlLock = () {
       if (_ctrlLocked) setState(() => _ctrlLocked = false);
@@ -114,6 +119,7 @@ class _TerminalPageState extends State<TerminalPage>
     // read keeps Row3 collapsed when no value has been saved yet.
     _row3Expanded =
         bind.mainGetLocalOption(key: kOptionShowTerminalCtrlKeys) == 'Y';
+
     // Initialize terminal connection
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _ffi.dialogManager
@@ -168,6 +174,7 @@ class _TerminalPageState extends State<TerminalPage>
     return EdgeInsets.only(left: 5.0, right: 5.0, top: topBottom, bottom: topBottom + _sysKeyboardHeight + _keyboardHeight);
   }
 
+
   /// Pastes clipboard text through TerminalModel so keyboard-only modifiers and
   /// mobile Enter normalization never alter clipboard data.
   Future<void> _pasteClipboardText() async {
@@ -200,6 +207,7 @@ class _TerminalPageState extends State<TerminalPage>
     unawaited(_pasteClipboardText());
     return KeyEventResult.handled;
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -238,7 +246,9 @@ class _TerminalPageState extends State<TerminalPage>
                     //
                     // Android works fine without this workaround.
                     deleteDetection: isIOS,
+
                     onKeyEvent: _handleTerminalKeyEvent,
+
                     padding: _calculatePadding(heightPx),
                     onSecondaryTapDown: (details, offset) async {
                       final selection = _terminalModel.terminalController.selection;
@@ -247,7 +257,9 @@ class _TerminalPageState extends State<TerminalPage>
                         _terminalModel.terminalController.clearSelection();
                         await Clipboard.setData(ClipboardData(text: text));
                       } else {
+
                         await _pasteClipboardText();
+
                       }
                     },
                   );
@@ -374,6 +386,7 @@ class _TerminalPageState extends State<TerminalPage>
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+
             // Row 1 follows the latest reviewed PR layout.
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -402,11 +415,13 @@ class _TerminalPageState extends State<TerminalPage>
                   ],
                 ],
               ),
+
           ],
         ),
       ),
     );
   }
+
 
   // Ctrl toggle button with highlighted locked state
   Widget _buildCtrlKeyButton() {
@@ -521,24 +536,29 @@ class _TerminalPageState extends State<TerminalPage>
     if (label == 'Ctrl') return _buildCtrlKeyButton();
     if (label == 'Alt') return _buildAltKeyButton();
 
+
     return ElevatedButton(
       onPressed: () {
         _sendKeyToTerminal(label);
       },
       child: Text(label),
       style: ElevatedButton.styleFrom(
+
         minimumSize: const Size(terminalKeyboardKeyWidth, 32),
         padding: EdgeInsets.zero,
         textStyle: const TextStyle(fontSize: 12),
         backgroundColor:
             Theme.of(context).colorScheme.surfaceContainerHighest,
+
         foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     );
   }
 
   void _sendKeyToTerminal(String key) {
+
     String send;
+
 
     switch (key) {
       case 'Esc':
@@ -582,7 +602,9 @@ class _TerminalPageState extends State<TerminalPage>
         break;
     }
 
+
     _terminalModel.sendVirtualKey(send);
+
   }
 
   // https://github.com/TerminalStudio/xterm.dart/issues/42#issuecomment-877495472

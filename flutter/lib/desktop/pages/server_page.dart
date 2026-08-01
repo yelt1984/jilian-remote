@@ -495,14 +495,18 @@ class _CmHeaderState extends State<_CmHeader>
                 if (client.type_() == ClientType.file)
                   FittedBox(
                     child: Text(
+
                       translate("Transfer file"),
+
                       style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ),
                 if (client.type_() == ClientType.camera)
                   FittedBox(
                     child: Text(
+
                       translate("View camera"),
+
                       style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ),

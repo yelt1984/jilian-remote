@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+
 import 'package:flutter/widgets.dart';
 
 /// Identifies where terminal input originated so paste data can bypass all
@@ -7,6 +8,7 @@ enum TerminalInputSource {
   keyboard,
   paste,
 }
+
 
 /// Returns true when a stale mobile one-shot Shift state should be released
 /// by replaying a tracked Shift key-down as a synthesized key-up.
@@ -44,6 +46,7 @@ bool shouldReleaseStaleMobileShift({
   }
   return true;
 }
+
 
 /// Applies the terminal Ctrl/Alt one-shot modifiers to a single input payload.
 ///
@@ -188,3 +191,4 @@ String _applyTerminalCtrlModifier(String data) {
   }
   return data;
 }
+

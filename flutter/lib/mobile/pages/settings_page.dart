@@ -220,11 +220,13 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
         _buildDate = buildDate;
       }
 
+
       final myId = await bind.mainGetMyId();
       if (_myId != myId) {
         update = true;
         _myId = myId;
       }
+
 
       final isUsingPublicServer = await bind.mainIsUsingPublicServer();
       if (_isUsingPublicServer != isUsingPublicServer) {
@@ -410,6 +412,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
         },
       ),
       SettingsTile.switchTile(
+
         title: Row(children: [
           Expanded(child: Text(translate('Use ID whitelisting'))),
           Offstage(
@@ -433,6 +436,7 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
         },
       ),
       SettingsTile.switchTile(
+
         title: Text(translate('Adaptive bitrate')),
         initialValue: _enableAbr,
         onToggle: isOptionFixed(kOptionEnableAbr)

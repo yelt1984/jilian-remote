@@ -7,7 +7,9 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/main.dart';
 import 'package:xterm/xterm.dart';
 
+
 import 'input_modifier_utils.dart';
+
 import 'model.dart';
 import 'platform_model.dart';
 
@@ -22,6 +24,7 @@ class TerminalModel with ChangeNotifier {
   bool get terminalOpened => _terminalOpened;
 
   bool _disposed = false;
+
 
   /// Callback to check whether Ctrl modifier lock is currently active.
   /// When active, keyboard input is mapped to control codes (e.g. 'b' → \x02).
@@ -42,6 +45,7 @@ class TerminalModel with ChangeNotifier {
   @visibleForTesting
   int get debugBufferedInputCount => _inputBuffer.length;
 
+
   // Buffer for output data received before terminal view has valid dimensions.
   // This prevents NaN errors when writing to terminal before layout is complete.
   final _pendingOutputChunks = <String>[];
@@ -61,9 +65,11 @@ class TerminalModel with ChangeNotifier {
   VoidCallback? onClosed;
 
   Future<void> _handleInput(String data) async {
+
     // xterm can complete asynchronous input after the Flutter page has gone
     // away. Stop before reading or clearing widget-owned modifier state.
     if (_disposed) return;
+
 
     // Soft keyboards (notably iOS) emit '\n' when Enter is pressed, while a
     // real keyboard's Enter sends '\r'. Some Android keyboards also emit '\n'.
@@ -72,6 +78,7 @@ class TerminalModel with ChangeNotifier {
     //   (readline, prompt_toolkit, vim, TUI frameworks) expect '\r'.
     // - Peer macOS: same as Linux, raw-mode apps expect '\r'
     //   (https://github.com/rustdesk/rustdesk/issues/14907).
+
     // So on mobile / web-mobile, normalize the original lone '\n' to '\r'
     // before modifier mappings. This keeps Ctrl+J mapped to LF instead of
     // having the generated control code rewritten to CR afterward.
@@ -109,6 +116,7 @@ class TerminalModel with ChangeNotifier {
     // Clipboard reads and native sends may complete after the terminal page has
     // closed. Never send or re-buffer input once this model is disposed.
     if (_disposed) return;
+
 
     if (_terminalOpened) {
       // Send user input to remote terminal
@@ -230,6 +238,7 @@ class TerminalModel with ChangeNotifier {
     return _handleInput(data);
   }
 
+
   Future<void> pasteText(String data) async {
     final payload = prepareTerminalInputPayload(
       data,
@@ -241,6 +250,7 @@ class TerminalModel with ChangeNotifier {
     );
     return _sendInputPayload(payload);
   }
+
 
   Future<void> closeTerminal() async {
     if (_terminalOpened) {
@@ -582,6 +592,7 @@ class TerminalModel with ChangeNotifier {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+
     terminal.onOutput = null;
     terminal.onResize = null;
     isCtrlLocked = null;
@@ -590,6 +601,7 @@ class TerminalModel with ChangeNotifier {
     clearAltLock = null;
     onResizeExternal = null;
     onClosed = null;
+
     // Clear buffers to free memory
     _inputBuffer.clear();
     _pendingOutputChunks.clear();
