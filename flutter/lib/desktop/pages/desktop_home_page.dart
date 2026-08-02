@@ -12,19 +12,18 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
-import 'package:flutter_hbb/desktop/widgets/update_progress.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/jilian_api.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/plugin/ui_manager.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
-import 'package:flutter_hbb/utils/platform_channel.dart';
 import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
+
 import '../widgets/button.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../common/widgets/autocomplete.dart';
@@ -410,7 +409,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget _buildScreenWallPage(BuildContext context) {
-    return const _JilianScreenWallPage();
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.grid_view_outlined, size: 64, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text('屏幕墙功能即将上线',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+        ],
+      ),
+    );
   }
 
   buildIDBoard(BuildContext context) {
@@ -660,27 +669,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         updateUrl.isNotEmpty &&
         !isCardClosed &&
         bind.mainUriPrefixSync().contains('rustdesk')) {
-      final isToUpdate = (isWindows || isMacOS) && bind.mainIsInstalled();
-      String btnText = isToUpdate ? 'Update' : 'Download';
-      GestureTapCallback onPressed = () async {
-        final Uri url = Uri.parse('https://rustdesk.com/download');
-        await launchUrl(url);
-      };
-      if (isToUpdate) {
-        onPressed = () {
-          handleUpdate(updateUrl);
-        };
-      }
       return buildInstallCard(
           "Status",
           "${translate("new-version-of-{${bind.mainGetAppNameSync()}}-tip")} (${bind.mainGetNewVersion()}).",
-          btnText,
-          onPressed,
-          closeButton: true,
-          help: isToUpdate ? 'Changelog' : null,
-          link: isToUpdate
-              ? 'https://github.com/rustdesk/rustdesk/releases/tag/${bind.mainGetNewVersion()}'
-              : null);
+          "Click to download", () async {
+        final Uri url = Uri.parse('https://rustdesk.com/download');
+        await launchUrl(url);
+      }, closeButton: true);
     }
     if (systemError.isNotEmpty) {
       return buildInstallCard("", systemError, "", () {});
@@ -973,13 +968,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       }
     });
     Get.put<RxBool>(svcStopped, tag: 'stop-service');
-    // 极连自定义客户端：默认开启「被控需输入访问密码」，类 ToDesk 安全策略
-    if (isCustomClient) {
-      final cur = bind.mainGetOptionSync(key: 'approve-mode');
-      if (cur.isEmpty) {
-        bind.mainSetOption(key: 'approve-mode', value: 'password');
-      }
-    }
     rustDeskWinManager.registerActiveWindowListener(onActiveWindowChanged);
 
     screenToMap(window_size.Screen screen) => {
@@ -998,23 +986,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           'scaleFactor': screen.scaleFactor,
         };
 
-    bool isChattyMethod(String methodName) {
-      switch (methodName) {
-        case kWindowBumpMouse: return true;
-      }
-
-      return false;
-    }
-
     rustDeskWinManager.setMethodHandler((call, fromWindowId) async {
-      if (!isChattyMethod(call.method)) {
-        debugPrint(
+      debugPrint(
           "[Main] call ${call.method} with args ${call.arguments} from window $fromWindowId");
-      }
       if (call.method == kWindowMainWindowOnTop) {
         windowOnTop(null);
-      } else if (call.method == kWindowRefreshCurrentUser) {
-        gFFI.userModel.refreshCurrentUser();
       } else if (call.method == kWindowGetWindowInfo) {
         final screen = (await window_size.getWindowInfo()).screen;
         if (screen == null) {
@@ -1036,17 +1012,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           call.arguments['id'],
           isFileTransfer: call.arguments['isFileTransfer'],
           isViewCamera: call.arguments['isViewCamera'],
-          isTerminal: call.arguments['isTerminal'],
           isTcpTunneling: call.arguments['isTcpTunneling'],
           isRDP: call.arguments['isRDP'],
           password: call.arguments['password'],
           forceRelay: call.arguments['forceRelay'],
           connToken: call.arguments['connToken'],
         );
-      } else if (call.method == kWindowBumpMouse) {
-        return RdPlatformChannel.instance.bumpMouse(
-          dx: call.arguments['dx'],
-          dy: call.arguments['dy']);
       } else if (call.method == kWindowEventMoveTabToNewWindow) {
         final args = call.arguments.split(',');
         int? windowId;
@@ -1141,17 +1112,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 }
 
 void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
-  final p0 = TextEditingController(text: "");
-  final p1 = TextEditingController(text: "");
+  final pw = await bind.mainGetPermanentPassword();
+  final p0 = TextEditingController(text: pw);
+  final p1 = TextEditingController(text: pw);
   var errMsg0 = "";
   var errMsg1 = "";
-  final localPasswordSet =
-      (await bind.mainGetCommon(key: "local-permanent-password-set")) == "true";
-  final permanentPasswordSet =
-      (await bind.mainGetCommon(key: "permanent-password-set")) == "true";
-  final presetPassword = permanentPasswordSet && !localPasswordSet;
-  var canSubmit = false;
-  final RxString rxPass = "".obs;
+  final RxString rxPass = pw.trim().obs;
   final rules = [
     DigitValidationRule(),
     UppercaseValidationRule(),
@@ -1160,21 +1126,9 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
     MinCharactersValidationRule(8),
   ];
   final maxLength = bind.mainMaxEncryptLen();
-  final statusTip = localPasswordSet
-      ? translate('password-hidden-tip')
-      : (presetPassword ? translate('preset-password-in-use-tip') : '');
-  final showStatusTipOnMobile =
-      statusTip.isNotEmpty && !isDesktop && !isWebDesktop;
 
   gFFI.dialogManager.show((setState, close, context) {
-    updateCanSubmit() {
-      canSubmit = p0.text.trim().isNotEmpty || p1.text.trim().isNotEmpty;
-    }
-
-    submit() async {
-      if (!canSubmit) {
-        return;
-      }
+    submit() {
       setState(() {
         errMsg0 = "";
         errMsg1 = "";
@@ -1197,13 +1151,7 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
         });
         return;
       }
-      final ok = await bind.mainSetPermanentPasswordWithResult(password: pass);
-      if (!ok) {
-        setState(() {
-          errMsg0 = '${translate('Prompt')}: ${translate("Failed")}';
-        });
-        return;
-      }
+      bind.mainSetPermanentPassword(password: pass);
       if (pass.isNotEmpty) {
         notEmptyCallback?.call();
       }
@@ -1211,20 +1159,14 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
     }
 
     return CustomAlertDialog(
-      title: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.key, color: MyTheme.accent),
-          Text(translate("Set Password")).paddingOnly(left: 10),
-        ],
-      ),
+      title: Text(translate("Set Password")),
       content: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 500),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              height: showStatusTipOnMobile ? 0.0 : 6.0,
+            const SizedBox(
+              height: 8.0,
             ),
             Row(
               children: [
@@ -1240,7 +1182,6 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
                       rxPass.value = value.trim();
                       setState(() {
                         errMsg0 = '';
-                        updateCanSubmit();
                       });
                     },
                     maxLength: maxLength,
@@ -1252,9 +1193,9 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
               children: [
                 Expanded(child: PasswordStrengthIndicator(password: rxPass)),
               ],
-            ).marginOnly(top: 2, bottom: showStatusTipOnMobile ? 2 : 8),
-            SizedBox(
-              height: showStatusTipOnMobile ? 0.0 : 8.0,
+            ).marginSymmetric(vertical: 8),
+            const SizedBox(
+              height: 8.0,
             ),
             Row(
               children: [
@@ -1268,7 +1209,6 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
                     onChanged: (value) {
                       setState(() {
                         errMsg1 = '';
-                        updateCanSubmit();
                       });
                     },
                     maxLength: maxLength,
@@ -1276,23 +1216,11 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
                 ),
               ],
             ),
-            if (statusTip.isNotEmpty)
-              Row(
-                children: [
-                  Icon(Icons.info, color: Colors.amber, size: 18)
-                      .marginOnly(right: 6),
-                  Expanded(
-                      child: Text(
-                    statusTip,
-                    style: const TextStyle(fontSize: 13, height: 1.1),
-                  ))
-                ],
-              ).marginOnly(top: 6, bottom: 2),
-            SizedBox(
-              height: showStatusTipOnMobile ? 0.0 : 8.0,
+            const SizedBox(
+              height: 8.0,
             ),
             Obx(() => Wrap(
-                  runSpacing: showStatusTipOnMobile ? 2.0 : 8.0,
+                  runSpacing: 8,
                   spacing: 4,
                   children: rules.map((e) {
                     var checked = e.validate(rxPass.value.trim());
@@ -1312,67 +1240,11 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
           ],
         ),
       ),
-      actions: (() {
-        final cancelButton = dialogButton(
-          "Cancel",
-          icon: Icon(Icons.close_rounded),
-          onPressed: close,
-          isOutline: true,
-        );
-        final removeButton = dialogButton(
-          "Remove",
-          icon: Icon(Icons.delete_outline_rounded),
-          onPressed: () async {
-            setState(() {
-              errMsg0 = "";
-              errMsg1 = "";
-            });
-            final ok =
-                await bind.mainSetPermanentPasswordWithResult(password: "");
-            if (!ok) {
-              setState(() {
-                errMsg0 = '${translate('Prompt')}: ${translate("Failed")}';
-              });
-              return;
-            }
-            close();
-          },
-          buttonStyle: ButtonStyle(
-              backgroundColor: MaterialStatePropertyAll(Colors.red)),
-        );
-        final okButton = dialogButton(
-          "OK",
-          icon: Icon(Icons.done_rounded),
-          onPressed: canSubmit ? submit : null,
-        );
-        if (!isDesktop && !isWebDesktop && localPasswordSet) {
-          return [
-            Align(
-              alignment: Alignment.centerRight,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    cancelButton,
-                    const SizedBox(width: 4),
-                    removeButton,
-                    const SizedBox(width: 4),
-                    okButton,
-                  ],
-                ),
-              ),
-            ),
-          ];
-        }
-        return [
-          cancelButton,
-          if (localPasswordSet) removeButton,
-          okButton,
-        ];
-      })(),
-      onSubmit: canSubmit ? submit : null,
+      actions: [
+        dialogButton("Cancel", onPressed: close, isOutline: true),
+        dialogButton("OK", onPressed: submit),
+      ],
+      onSubmit: submit,
       onCancel: close,
     );
   });
@@ -1493,8 +1365,7 @@ class _JilianProfileContentState extends State<_JilianProfileContent> {
           showToast('无法读取头像文件');
           return;
         }
-        await _uploadAvatarBytes(fileBytes, file.extension ?? 'png');
-        return;
+        return _uploadAvatarBytes(fileBytes, file.extension ?? 'png');
       }
       if (bytes.length > 3 * 1024 * 1024) {
         showToast('头像过大(最大3MB)');
@@ -2443,44 +2314,52 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     );
   }
 
-  /// 远程设备详情面板：按 ToDesk 风格分块排列（4 列紧凑网格）
+  /// 远程设备详情面板：按 ToDesk 风格分块排列
   Widget _buildRemoteDetailPanel(BuildContext context, String id, String name) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader('基础连接'),
         const SizedBox(height: 12),
-        _buildActionGrid([
-          _buildBigAction(Icons.desktop_windows, '远程控制',
-              MyTheme.accent, () => connect(context, id)),
-          _buildBigAction(Icons.folder_copy, '文件传输', Colors.blueGrey,
-              () => connect(context, id, isFileTransfer: true)),
-          _buildBigAction(Icons.terminal, '终端', Colors.blueGrey,
-              () => _showTerminalNotice(context)),
-          _buildBigAction(Icons.visibility, '观看模式', Colors.blueGrey,
-              () => connect(context, id)),
-          _buildBigAction(Icons.people_alt, '协作模式', Colors.blueGrey,
-              () => connect(context, id)),
-          _buildBigAction(Icons.videocam, '摄像头', Colors.blueGrey,
-              () {
-            showToast('正在连接远程摄像头...');
-            connect(context, id, isViewCamera: true);
-          }),
-          _buildBigAction(Icons.fit_screen, '镜像屏', Colors.blueGrey,
-              () => _showMirrorScreenNotice(context)),
-          _buildBigAction(Icons.open_in_full, '扩展屏', Colors.blueGrey,
-              () => _showExtendScreenNotice(context)),
-        ]),
+        Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          children: [
+            _buildBigAction(Icons.desktop_windows, '远程控制',
+                MyTheme.accent, () => connect(context, id)),
+            _buildBigAction(Icons.folder_copy, '文件传输', Colors.blueGrey,
+                () => connect(context, id, isFileTransfer: true)),
+            _buildBigAction(Icons.terminal, '终端', Colors.blueGrey,
+                () => _showTerminalNotice(context)),
+            _buildBigAction(Icons.visibility, '观看模式', Colors.blueGrey,
+                () => connect(context, id)),
+            _buildBigAction(Icons.people_alt, '协作模式', Colors.blueGrey,
+                () => connect(context, id)),
+            _buildBigAction(Icons.videocam, '摄像头', Colors.blueGrey,
+                () {
+              showToast('正在连接远程摄像头...');
+              connect(context, id, isViewCamera: true);
+            }),
+            _buildBigAction(Icons.fit_screen, '镜像屏', Colors.blueGrey,
+                () => _showMirrorScreenNotice(context)),
+            _buildBigAction(Icons.open_in_full, '扩展屏', Colors.blueGrey,
+                () => _showExtendScreenNotice(context)),
+          ],
+        ),
         const SizedBox(height: 24),
         _buildSectionHeader('辅助工具'),
         const SizedBox(height: 12),
-        _buildActionGrid([
-          _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
-              () => _openFileCenter(context, id)),
-          _buildBigAction(Icons.sports_esports, '游戏与应用中心',
-              Colors.deepOrange,
-              () => _showGameCenterNotice(context)),
-        ]),
+        Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          children: [
+            _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
+                () => _openFileCenter(context, id)),
+            _buildBigAction(Icons.sports_esports, '游戏与应用中心',
+                Colors.deepOrange,
+                () => _showGameCenterNotice(context)),
+          ],
+        ),
         const SizedBox(height: 24),
         _buildSectionHeader('电源操作'),
         const SizedBox(height: 12),
@@ -2515,19 +2394,6 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           ],
         ),
       ],
-    );
-  }
-
-  /// 4 列操作按钮网格（按 ToDesk 风格紧凑排列）
-  Widget _buildActionGrid(List<Widget> children) {
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 4,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 0.9,
-      children: children,
     );
   }
 
@@ -2594,15 +2460,21 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
         ]),
         content: Text(
           type == 'shutdown'
-              ? '即将对 "$name" 执行关机。\n\n连接成功后会自动执行，无需再点任何工具栏按钮。'
+              ? 'RustDesk 开源核心未提供「远程一键关机」接口，无法直接对 "$name" 执行关机。\n\n请点击下方「打开远程桌面」，进入系统后通过开始菜单关机。'
               : '即将对 "$name" 执行$action。\n\n连接成功后会自动执行，无需再点任何工具栏按钮。',
         ),
         actions: [
           dialogButton('取消', onPressed: close, isOutline: true),
-          dialogButton('确认$action', onPressed: () {
+          dialogButton(type == 'shutdown' ? '打开远程桌面' : '确认$action',
+              onPressed: () {
             close();
-            showToast('正在连接 $name 并执行$action...');
-            connect(context, id, autoPowerAction: type);
+            if (type == 'shutdown') {
+              connect(context, id);
+              showToast('请在远程窗口中通过开始菜单关机');
+            } else {
+              showToast('正在连接 $name 并执行$action...');
+              connect(context, id, autoPowerAction: type);
+            }
           }),
         ],
       );
@@ -2666,13 +2538,17 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
             const SizedBox(height: 24),
             _buildSectionHeader('辅助工具'),
             const SizedBox(height: 12),
-            _buildActionGrid([
-              _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
-                  () => _showFileCenterNotice(context)),
-              _buildBigAction(Icons.sports_esports, '游戏与应用中心',
-                  Colors.deepOrange,
-                  () => _showGameCenterNotice(context)),
-            ]),
+            Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: [
+                _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
+                    () => _showFileCenterNotice(context)),
+                _buildBigAction(Icons.sports_esports, '游戏与应用中心',
+                    Colors.deepOrange,
+                    () => _showGameCenterNotice(context)),
+              ],
+            ),
             const SizedBox(height: 24),
             _buildSectionHeader('电源操作'),
             const SizedBox(height: 12),
@@ -4108,261 +3984,6 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
           ),
           // 右侧品牌面板
           _buildBrandPanel(),
-        ],
-      ),
-    );
-  }
-}
-
-/// 极连远程：屏幕墙（监控墙）——在一个界面展示多台电脑的实时画面入口。
-/// 仅展示电脑设备（排除手机端），点击「实时查看」打开该设备的实时画面。
-class _JilianScreenWallPage extends StatefulWidget {
-  const _JilianScreenWallPage({Key? key}) : super(key: key);
-
-  @override
-  State<_JilianScreenWallPage> createState() => _JilianScreenWallPageState();
-}
-
-class _JilianScreenWallPageState extends State<_JilianScreenWallPage> {
-  List<JilianDevice> _devices = [];
-  bool _loading = false;
-  String? _error;
-  final Map<String, bool> _onlineStates = {};
-  Timer? _onlineTimer;
-  static const _onlineEvent = 'callback_query_onlines';
-  static const _onlineHandlerKey = 'jilian_screen_wall';
-
-  @override
-  void initState() {
-    super.initState();
-    platformFFI.registerEventHandler(_onlineEvent, _onlineHandlerKey, (evt) async {
-      _onOnlineEvent(evt);
-    });
-    _loadDevices();
-    jilianApi.loginState.listen((_) {
-      if (mounted) _loadDevices();
-    });
-  }
-
-  @override
-  void dispose() {
-    _onlineTimer?.cancel();
-    platformFFI.unregisterEventHandler(_onlineEvent, _onlineHandlerKey);
-    super.dispose();
-  }
-
-  void _onOnlineEvent(Map<String, dynamic> evt) {
-    final onlines = (evt['onlines'] as String? ?? '')
-        .split(',')
-        .where((s) => s.isNotEmpty);
-    final offlines = (evt['offlines'] as String? ?? '')
-        .split(',')
-        .where((s) => s.isNotEmpty);
-    if (mounted) {
-      setState(() {
-        for (final id in onlines) _onlineStates[id] = true;
-        for (final id in offlines) _onlineStates[id] = false;
-      });
-    }
-  }
-
-  Future<void> _queryOnlineStates() async {
-    final localId = trimID(gFFI.serverModel.serverId.text);
-    final ids = <String>{};
-    for (final d in _devices) {
-      final id = trimID(d.deviceId);
-      if (id.isNotEmpty && id != localId) ids.add(id);
-    }
-    if (ids.isNotEmpty) {
-      try {
-        await bind.queryOnlines(ids: ids.toList(growable: false));
-      } catch (e) {
-        debugPrint('screen wall queryOnlines error: $e');
-      }
-    }
-  }
-
-  Future<void> _loadDevices() async {
-    if (!jilianApi.isLoggedIn) {
-      if (mounted) {
-        setState(() {
-          _devices = [];
-          _loading = false;
-        });
-      }
-      return;
-    }
-    if (mounted) setState(() => _loading = true);
-    try {
-      final list = await jilianApi.getDeviceList();
-      if (mounted) {
-        setState(() {
-          _devices = list;
-          _loading = false;
-          _error = null;
-        });
-      }
-      _queryOnlineStates();
-      _onlineTimer?.cancel();
-      _onlineTimer =
-          Timer.periodic(const Duration(seconds: 8), (_) => _queryOnlineStates());
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = '加载失败：$e';
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  IconData _platformIcon(String? platform) {
-    switch ((platform ?? '').toLowerCase()) {
-      case 'windows':
-        return Icons.desktop_windows;
-      case 'macos':
-      case 'mac':
-        return Icons.laptop_mac;
-      case 'linux':
-        return Icons.computer;
-      case 'android':
-        return Icons.phone_android;
-      case 'ios':
-        return Icons.phone_iphone;
-      default:
-        return Icons.device_unknown;
-    }
-  }
-
-  bool _isMobile(String? platform) {
-    final p = (platform ?? '').toLowerCase();
-    return p == 'android' || p == 'ios';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!jilianApi.isLoggedIn) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.grid_view_outlined,
-                size: 64, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text('请先登录极连账号以使用屏幕墙',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-          ],
-        ),
-      );
-    }
-
-    final localId = trimID(gFFI.serverModel.serverId.text);
-    // 仅展示电脑设备（排除手机端），本机也排除
-    final computers = _devices.where((d) {
-      final id = trimID(d.deviceId);
-      return id != localId && !_isMobile(d.platform);
-    }).toList();
-
-    if (_loading && computers.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (computers.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.grid_view_outlined,
-                size: 64, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            Text('暂无可监控的电脑设备',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-            const SizedBox(height: 8),
-            Text('在「设备列表」中添加电脑后，这里会显示其实时画面入口',
-                style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-          ],
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text('屏幕墙 · 监控 ${computers.length} 台电脑',
-                style: Theme.of(context).textTheme.titleMedium),
-          ),
-          Expanded(
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 300,
-                mainAxisSpacing: 16,
-                crossAxisSpacing: 16,
-                childAspectRatio: 1.5,
-              ),
-              itemCount: computers.length,
-              itemBuilder: (context, index) {
-                final d = computers[index];
-                final id = trimID(d.deviceId);
-                final online = _onlineStates[id] ?? (d.isOnline == 1);
-                final name = d.deviceName.isNotEmpty
-                    ? d.deviceName
-                    : (d.deviceAlias.isNotEmpty ? d.deviceAlias : id);
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: Theme.of(context)
-                            .dividerColor
-                            .withOpacity(0.5)),
-                  ),
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(_platformIcon(d.platform),
-                              size: 22, color: MyTheme.accent),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(name,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 14),
-                                overflow: TextOverflow.ellipsis),
-                          ),
-                          Container(
-                            width: 9,
-                            height: 9,
-                            decoration: BoxDecoration(
-                              color: online ? Colors.green : Colors.grey,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(id,
-                          style:
-                              const TextStyle(color: Colors.grey, fontSize: 12)),
-                      const Spacer(),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: online ? () => connect(context, id) : null,
-                          icon: const Icon(Icons.visibility, size: 16),
-                          label: Text(online ? '实时查看' : '离线'),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
         ],
       ),
     );
