@@ -4135,7 +4135,7 @@ class _JilianScreenWallPageState extends State<_JilianScreenWallPage> {
   @override
   void initState() {
     super.initState();
-    platformFFI.registerEventHandler(_onlineEvent, _onlineHandlerKey, (evt) {
+    platformFFI.registerEventHandler(_onlineEvent, _onlineHandlerKey, (evt) async {
       _onOnlineEvent(evt);
     });
     _loadDevices();
