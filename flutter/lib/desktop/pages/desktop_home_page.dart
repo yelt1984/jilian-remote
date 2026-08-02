@@ -13,6 +13,8 @@ import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
 import 'package:flutter_hbb/desktop/widgets/mini_remote_view.dart';
+import 'package:flutter_hbb/generated_bridge.dart'
+    if (dart.library.html) 'package:flutter_hbb/web/bridge.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
@@ -194,8 +196,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       minimumSize: const Size(0, 32),
                     ),
-                    child: const Text('切换团队...',
-                        style: TextStyle(fontSize: 12)),
+                    child:
+                        const Text('切换团队...', style: TextStyle(fontSize: 12)),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -214,8 +216,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       minimumSize: const Size(0, 32),
                     ),
-                    child: const Text('个人中心',
-                        style: TextStyle(fontSize: 12)),
+                    child: const Text('个人中心', style: TextStyle(fontSize: 12)),
                   ),
                 ),
               ],
@@ -225,14 +226,23 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           // 导航
           Obx(() => Column(
                 children: [
-                  _buildNavTile(Icons.home_outlined, '主页',
-                      _selectedIndex.value == 0, textColor,
+                  _buildNavTile(
+                      Icons.home_outlined,
+                      '主页',
+                      _selectedIndex.value == 0,
+                      textColor,
                       () => _selectedIndex.value = 0),
-                  _buildNavTile(Icons.devices_outlined, '设备列表',
-                      _selectedIndex.value == 1, textColor,
+                  _buildNavTile(
+                      Icons.devices_outlined,
+                      '设备列表',
+                      _selectedIndex.value == 1,
+                      textColor,
                       () => _selectedIndex.value = 1),
-                  _buildNavTile(Icons.grid_view_outlined, '屏幕墙',
-                      _selectedIndex.value == 2, textColor,
+                  _buildNavTile(
+                      Icons.grid_view_outlined,
+                      '屏幕墙',
+                      _selectedIndex.value == 2,
+                      textColor,
                       () => _selectedIndex.value = 2),
                   _buildNavTile(Icons.settings_outlined, '高级设置',
                       _selectedIndex.value == 3, textColor, () {
@@ -258,8 +268,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     color: MyTheme.accent,
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Icon(Icons.computer,
-                      color: Colors.white, size: 20),
+                  child:
+                      const Icon(Icons.computer, color: Colors.white, size: 20),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -305,9 +315,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? MyTheme.accent.withOpacity(0.1)
-              : Colors.transparent,
+          color:
+              selected ? MyTheme.accent.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -357,8 +366,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
                 GestureDetector(
                   onDoubleTap: () {
-                    Clipboard.setData(
-                        ClipboardData(text: model.serverId.text));
+                    Clipboard.setData(ClipboardData(text: model.serverId.text));
                     showToast(translate('Copied'));
                   },
                   child: Text(model.serverId.text,
@@ -1121,7 +1129,7 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
   final maxLength = bind.mainMaxEncryptLen();
 
   gFFI.dialogManager.show((setState, close, context) {
-    submit() {
+    submit() async {
       setState(() {
         errMsg0 = "";
         errMsg1 = "";
@@ -1253,7 +1261,8 @@ void showJilianLoginDialog(BuildContext context) {
     return CustomAlertDialog(
       title: null,
       contentPadding: 0,
-      contentBoxConstraints: const BoxConstraints(maxWidth: 760, maxHeight: 540),
+      contentBoxConstraints:
+          const BoxConstraints(maxWidth: 760, maxHeight: 540),
       content: SizedBox(
         width: 720,
         height: 520,
@@ -1270,7 +1279,8 @@ void _showProfileDialog(BuildContext context) {
     return CustomAlertDialog(
       title: null,
       contentPadding: 0,
-      contentBoxConstraints: const BoxConstraints(maxWidth: 460, maxHeight: 560),
+      contentBoxConstraints:
+          const BoxConstraints(maxWidth: 460, maxHeight: 560),
       content: SizedBox(
         width: 440,
         height: 540,
@@ -1382,11 +1392,9 @@ class _JilianProfileContentState extends State<_JilianProfileContent> {
         const targetSize = 256;
         final resized = decoded.width > decoded.height
             ? img.copyResize(decoded,
-                width: targetSize,
-                interpolation: img.Interpolation.cubic)
+                width: targetSize, interpolation: img.Interpolation.cubic)
             : img.copyResize(decoded,
-                height: targetSize,
-                interpolation: img.Interpolation.cubic);
+                height: targetSize, interpolation: img.Interpolation.cubic);
         uploadBytes = img.encodeJpg(resized, quality: 85);
         uploadExt = 'jpg';
       }
@@ -1478,62 +1486,64 @@ class _JilianProfileContentState extends State<_JilianProfileContent> {
                 ),
               ),
               Column(
-            children: [
-              GestureDetector(
-                onTap: _uploading ? null : _pickAvatar,
-                child: Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: 42,
-                      backgroundImage: _avatarImage(),
-                      backgroundColor: Colors.white,
-                      child: _avatarImage() == null
-                          ? const Icon(Icons.person, size: 48, color: Colors.grey)
-                          : null,
+                children: [
+                  GestureDetector(
+                    onTap: _uploading ? null : _pickAvatar,
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 42,
+                          backgroundImage: _avatarImage(),
+                          backgroundColor: Colors.white,
+                          child: _avatarImage() == null
+                              ? const Icon(Icons.person,
+                                  size: 48, color: Colors.grey)
+                              : null,
+                        ),
+                        if (_uploading)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                  color: Colors.black38,
+                                  shape: BoxShape.circle),
+                              child: const CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 3),
+                            ),
+                          )
+                        else
+                          Positioned(
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                  color: Colors.white, shape: BoxShape.circle),
+                              child: Icon(Icons.camera_alt,
+                                  size: 16, color: MyTheme.accent),
+                            ),
+                          ),
+                      ],
                     ),
-                    if (_uploading)
-                      Positioned.fill(
-                        child: Container(
-                          decoration: const BoxDecoration(
-                              color: Colors.black38, shape: BoxShape.circle),
-                          child: const CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 3),
-                        ),
-                      )
-                    else
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                              color: Colors.white, shape: BoxShape.circle),
-                          child: Icon(Icons.camera_alt,
-                              size: 16, color: MyTheme.accent),
-                        ),
-                      ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(displayName,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text('个人版',
+                        style: TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Text(displayName,
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text('个人版',
-                    style: TextStyle(color: Colors.white, fontSize: 12)),
-              ),
-            ],
-          ),
             ],
           ),
         ),
@@ -1542,14 +1552,17 @@ class _JilianProfileContentState extends State<_JilianProfileContent> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              _infoRow(Icons.computer, '主设备',
-                  gFFI.serverModel.serverId.text.isEmpty ? '本机' : formatID(gFFI.serverModel.serverId.text)),
+              _infoRow(
+                  Icons.computer,
+                  '主设备',
+                  gFFI.serverModel.serverId.text.isEmpty
+                      ? '本机'
+                      : formatID(gFFI.serverModel.serverId.text)),
               _infoRow(Icons.devices, '设备数量',
                   _deviceCount < 0 ? '加载失败' : '$_deviceCount 台'),
-              _infoRow(Icons.phone_android, '手机号',
-                  phone.isNotEmpty ? phone : '未绑定'),
-              _infoRow(Icons.email, '邮箱',
-                  email.isNotEmpty ? email : '未绑定'),
+              _infoRow(
+                  Icons.phone_android, '手机号', phone.isNotEmpty ? phone : '未绑定'),
+              _infoRow(Icons.email, '邮箱', email.isNotEmpty ? email : '未绑定'),
               const SizedBox(height: 16),
               if (_editing) ...[
                 TextField(
@@ -1583,18 +1596,15 @@ class _JilianProfileContentState extends State<_JilianProfileContent> {
                 SizedBox(
                     width: double.infinity,
                     child: dialogButton('修改密码',
-                        onPressed: _showChangePasswordDialog,
-                        isOutline: true)),
+                        onPressed: _showChangePasswordDialog, isOutline: true)),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
-                  child: dialogButton('退出登录',
-                      onPressed: () async {
-                        await jilianApi.logout();
-                        widget.onClose();
-                        showToast('已退出登录');
-                      },
-                      isOutline: true),
+                  child: dialogButton('退出登录', onPressed: () async {
+                    await jilianApi.logout();
+                    widget.onClose();
+                    showToast('已退出登录');
+                  }, isOutline: true),
                 ),
               ],
             ],
@@ -1617,8 +1627,8 @@ class _JilianProfileContentState extends State<_JilianProfileContent> {
           Expanded(
             child: Text(value,
                 textAlign: TextAlign.right,
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w500),
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                 overflow: TextOverflow.ellipsis),
           ),
         ],
@@ -1758,8 +1768,8 @@ class _JilianChangePasswordContentState
             decoration: InputDecoration(
               labelText: '旧密码',
               suffixIcon: IconButton(
-                icon: Icon(
-                    _obscureOld ? Icons.visibility_off : Icons.visibility),
+                icon:
+                    Icon(_obscureOld ? Icons.visibility_off : Icons.visibility),
                 onPressed: () => setState(() => _obscureOld = !_obscureOld),
               ),
             ),
@@ -1816,8 +1826,8 @@ class _JilianChangePasswordContentState
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: dialogButton('确定',
-                  onPressed: _submitting ? null : _submit),
+              child:
+                  dialogButton('确定', onPressed: _submitting ? null : _submit),
             ),
           ],
         ),
@@ -1860,7 +1870,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
         });
       }
     });
-    platformFFI.registerEventHandler(_onlineEvent, _onlineHandlerKey, (evt) async {
+    platformFFI.registerEventHandler(_onlineEvent, _onlineHandlerKey,
+        (evt) async {
       _onOnlineEvent(evt);
     });
     _loadAll();
@@ -1878,8 +1889,11 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
   }
 
   void _onOnlineEvent(Map<String, dynamic> evt) {
-    final onlines = (evt['onlines'] as String? ?? '').split(',').where((s) => s.isNotEmpty);
-    final offlines = (evt['offlines'] as String? ?? '').split(',').where((s) => s.isNotEmpty);
+    final onlines =
+        (evt['onlines'] as String? ?? '').split(',').where((s) => s.isNotEmpty);
+    final offlines = (evt['offlines'] as String? ?? '')
+        .split(',')
+        .where((s) => s.isNotEmpty);
     if (mounted) {
       setState(() {
         for (final id in onlines) {
@@ -1894,7 +1908,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
 
   void _startOnlineQuery() {
     _onlineTimer?.cancel();
-    _onlineTimer = Timer.periodic(const Duration(seconds: 8), (_) => _queryOnlineStates());
+    _onlineTimer =
+        Timer.periodic(const Duration(seconds: 8), (_) => _queryOnlineStates());
   }
 
   Future<void> _queryOnlineStates() async {
@@ -1952,7 +1967,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
               ? '${p.username}@${p.hostname}'
               : (p.hostname.isNotEmpty ? p.hostname : '远程设备'));
       try {
-        await jilianApi.bindPeerDevice(id, name, platform: p.platform, alias: p.alias);
+        await jilianApi.bindPeerDevice(id, name,
+            platform: p.platform, alias: p.alias);
       } catch (e) {
         debugPrint('sync peer $id failed: $e');
       }
@@ -2126,11 +2142,14 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                           if (recentCount > 0) ...[
                             _buildSectionTitle('最近连接', recentCount),
                             const SizedBox(height: 10),
-                            ..._recentPeers.map((p) => _buildRecentPeerRow(context, p)),
+                            ..._recentPeers
+                                .map((p) => _buildRecentPeerRow(context, p)),
                             const SizedBox(height: 20),
                           ],
                           if (cloudCount > 0) ...[
-                            _buildSectionTitle(jilianApi.isLoggedIn ? '我的设备' : '本机设备', cloudCount),
+                            _buildSectionTitle(
+                                jilianApi.isLoggedIn ? '我的设备' : '本机设备',
+                                cloudCount),
                             const SizedBox(height: 10),
                             ..._devices.map((d) => _buildDeviceRow(context, d)),
                           ],
@@ -2196,7 +2215,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
       id = device.deviceId;
       final localId = trimID(gFFI.serverModel.serverId.text);
       isLocal = device.deviceId == localId || formatID(id) == formatID(localId);
-      online = isLocal || (_onlineStates[trimID(device.deviceId)] ?? (device.isOnline == 1));
+      online = isLocal ||
+          (_onlineStates[trimID(device.deviceId)] ?? (device.isOnline == 1));
     } else {
       final p = peer!;
       name = p.alias.isNotEmpty
@@ -2225,82 +2245,82 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
               children: [
                 Icon(Icons.computer,
                     size: 40, color: online ? MyTheme.accent : Colors.grey),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(name,
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w600),
-                        overflow: TextOverflow.ellipsis),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                              color: online ? Colors.green : Colors.grey,
-                              shape: BoxShape.circle),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(online ? '在线' : '离线',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600)),
-                        if (isLocal) ...[
-                          const SizedBox(width: 8),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                            width: 8,
+                            height: 8,
                             decoration: BoxDecoration(
-                              color: MyTheme.accent,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text('本机',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.white)),
+                                color: online ? Colors.green : Colors.grey,
+                                shape: BoxShape.circle),
                           ),
+                          const SizedBox(width: 6),
+                          Text(online ? '在线' : '离线',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey.shade600)),
+                          if (isLocal) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: MyTheme.accent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text('本机',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.white)),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                  icon: const Icon(Icons.close), onPressed: _clearSelection),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Divider(),
-          const SizedBox(height: 4),
-          Text('设备代码',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Expanded(
-                child: SelectableText(formatID(id),
-                    style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2)),
-              ),
-              IconButton(
-                icon: const Icon(Icons.copy, size: 18),
-                tooltip: '复制设备码',
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: formatID(id)));
-                  showToast('设备码已复制');
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          if (isLocal)
-            _buildLocalDetailPanel(id)
-          else
-            _buildRemoteDetailPanel(context, id, name),
+                IconButton(
+                    icon: const Icon(Icons.close), onPressed: _clearSelection),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 4),
+            Text('设备代码',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: SelectableText(formatID(id),
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 18),
+                  tooltip: '复制设备码',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: formatID(id)));
+                    showToast('设备码已复制');
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            if (isLocal)
+              _buildLocalDetailPanel(id)
+            else
+              _buildRemoteDetailPanel(context, id, name),
           ],
         ),
       ),
@@ -2318,8 +2338,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           spacing: 14,
           runSpacing: 14,
           children: [
-            _buildBigAction(Icons.desktop_windows, '远程控制',
-                MyTheme.accent, () => connect(context, id)),
+            _buildBigAction(Icons.desktop_windows, '远程控制', MyTheme.accent,
+                () => connect(context, id)),
             _buildBigAction(Icons.folder_copy, '文件传输', Colors.blueGrey,
                 () => connect(context, id, isFileTransfer: true)),
             _buildBigAction(Icons.terminal, '终端', Colors.blueGrey,
@@ -2328,8 +2348,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                 () => connect(context, id)),
             _buildBigAction(Icons.people_alt, '协作模式', Colors.blueGrey,
                 () => connect(context, id)),
-            _buildBigAction(Icons.videocam, '摄像头', Colors.blueGrey,
-                () {
+            _buildBigAction(Icons.videocam, '摄像头', Colors.blueGrey, () {
               showToast('正在连接远程摄像头...');
               connect(context, id, isViewCamera: true);
             }),
@@ -2348,8 +2367,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           children: [
             _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
                 () => _openFileCenter(context, id)),
-            _buildBigAction(Icons.sports_esports, '游戏与应用中心',
-                Colors.deepOrange,
+            _buildBigAction(Icons.sports_esports, '游戏与应用中心', Colors.deepOrange,
                 () => _showGameCenterNotice(context)),
           ],
         ),
@@ -2381,7 +2399,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                 label: '关机',
                 icon: Icons.power_settings_new,
                 color: Colors.red.shade500,
-                onPressed: () => _doRemotePowerOp(context, id, name, 'shutdown'),
+                onPressed: () =>
+                    _doRemotePowerOp(context, id, name, 'shutdown'),
               ),
             ),
           ],
@@ -2430,7 +2449,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
 
   /// 远程电源操作：后台静默建立会话，连接成功后立即发送电源指令并关闭会话。
   /// 不再需要打开远程桌面窗口，也不再依赖工具栏二次操作。
-  void _doRemotePowerOp(BuildContext context, String id, String name, String type) {
+  void _doRemotePowerOp(
+      BuildContext context, String id, String name, String type) {
     final action = type == 'lock'
         ? '锁屏'
         : type == 'restart'
@@ -2511,12 +2531,22 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
       }
 
       final stream = bind.sessionStart(sessionId: sessionId, id: id);
-      sub = stream.listen((evt) async {
+      sub = stream.listen((message) async {
+        // Rust 侧推送的是 EventToUI 联合类型，事件体是 JSON 字符串
+        if (message is! EventToUI_Event) return;
+        if (message.field0 == 'close') return;
+        Map<String, dynamic>? evt;
+        try {
+          evt = json.decode(message.field0) as Map<String, dynamic>;
+        } catch (_) {
+          return;
+        }
         final eventName = evt['name'];
-        if (eventName == 'connection_ready' || eventName == 'peer_info') {
+        if (eventName == 'peer_info') {
           if (executed) return;
           executed = true;
-          await Future.delayed(const Duration(milliseconds: 500));
+          // 等待 Rust 侧完成登录后的初始化
+          await Future.delayed(const Duration(milliseconds: 800));
           switch (type) {
             case 'lock':
               await bind.sessionLockScreen(sessionId: sessionId);
@@ -2537,7 +2567,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           final text = evt['text']?.toString() ?? '';
           if (msgType == 'input-password' ||
               msgType == 're-input-password' ||
-              (title.contains('Connection Error') && text.contains('offline'))) {
+              (title.contains('Connection Error') &&
+                  text.contains('offline'))) {
             onError('"$name" 需要访问密码或已离线，$action指令未执行');
           } else if (msgType == 'error' || title.contains('Connection Error')) {
             onError('连接 "$name" 失败，$action指令未执行');
@@ -2547,8 +2578,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
         onError('连接 "$name" 失败: $e');
       });
 
-      // 15 秒超时兜底
-      Future.delayed(const Duration(seconds: 15), () {
+      // 25 秒超时兜底（中继连接可能较慢）
+      Future.delayed(const Duration(seconds: 25), () {
         if (!executed && !disposed) {
           onError('"$name" 未响应，$action指令未执行');
         }
@@ -2605,7 +2636,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                 ),
                 icon: const Icon(Icons.copy, size: 18),
                 label: const Text('复制邀请信息',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: invite.trim()));
                   showToast('邀请信息已复制');
@@ -2622,8 +2654,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                 _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
                     () => _showFileCenterNotice(context)),
                 _buildBigAction(Icons.sports_esports, '游戏与应用中心',
-                    Colors.deepOrange,
-                    () => _showGameCenterNotice(context)),
+                    Colors.deepOrange, () => _showGameCenterNotice(context)),
               ],
             ),
             const SizedBox(height: 24),
@@ -2723,9 +2754,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
             Text(label,
                 style: TextStyle(
                     fontSize: 12,
-                    color: enabled
-                        ? Colors.grey.shade800
-                        : Colors.grey.shade400)),
+                    color:
+                        enabled ? Colors.grey.shade800 : Colors.grey.shade400)),
           ],
         ),
       ),
@@ -2847,8 +2877,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                             ],
                           ),
                         ),
-                        Icon(Icons.chevron_right,
-                            color: Colors.grey.shade400),
+                        Icon(Icons.chevron_right, color: Colors.grey.shade400),
                       ],
                     ),
                   ),
@@ -2859,8 +2888,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('取消')),
+              onPressed: () => Navigator.pop(ctx), child: const Text('取消')),
         ],
       ),
     );
@@ -2890,11 +2918,14 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     final localId = trimID(gFFI.serverModel.serverId.text);
     final isLocalDevice =
         d.deviceId == localId || formattedId == formatID(localId);
-    final online = isLocalDevice || (_onlineStates[trimID(d.deviceId)] ?? (d.isOnline == 1));
-    final selected = _selectedDevice != null && _selectedDevice!.deviceId == d.deviceId;
+    final online = isLocalDevice ||
+        (_onlineStates[trimID(d.deviceId)] ?? (d.isOnline == 1));
+    final selected =
+        _selectedDevice != null && _selectedDevice!.deviceId == d.deviceId;
     return GestureDetector(
       onTap: () => _selectDevice(d),
-      onSecondaryTapUp: (details) => _showDeviceContextMenu(context, d, details.globalPosition),
+      onSecondaryTapUp: (details) =>
+          _showDeviceContextMenu(context, d, details.globalPosition),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -2910,80 +2941,81 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
               width: selected ? 2 : 1),
         ),
         child: Row(
-        children: [
-          // 在线状态点
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: online ? Colors.green : Colors.grey.shade400,
-              shape: BoxShape.circle,
+          children: [
+            // 在线状态点
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: online ? Colors.green : Colors.grey.shade400,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // 平台图标
-          Icon(Icons.computer,
-              size: 28, color: online ? MyTheme.accent : Colors.grey),
-          const SizedBox(width: 14),
-          // 名称与设备码
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(name,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600),
-                          overflow: TextOverflow.ellipsis),
-                    ),
-                    if (isLocalDevice) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: MyTheme.accent,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text('本机',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500)),
+            const SizedBox(width: 12),
+            // 平台图标
+            Icon(Icons.computer,
+                size: 28, color: online ? MyTheme.accent : Colors.grey),
+            const SizedBox(width: 14),
+            // 名称与设备码
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(name,
+                            style: const TextStyle(
+                                fontSize: 15, fontWeight: FontWeight.w600),
+                            overflow: TextOverflow.ellipsis),
                       ),
+                      if (isLocalDevice) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: MyTheme.accent,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text('本机',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500)),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(formattedId,
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.grey.shade600)),
-              ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(formattedId,
+                      style:
+                          TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          // 操作按钮：本机不展示控制按钮
-          if (!isLocalDevice)
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                _buildActionButton('连接', MyTheme.accent, Colors.white,
-                    () => connect(context, d.deviceId)),
-                _buildActionButton('文件传输', Colors.grey.shade100,
-                    Colors.grey.shade800,
-                    () => connect(context, d.deviceId, isFileTransfer: true)),
-                _buildActionButton('观看', Colors.grey.shade100,
-                    Colors.grey.shade800,
-                    () => connect(context, d.deviceId)),
-                _buildActionButton('协作', Colors.grey.shade100,
-                    Colors.grey.shade800,
-                    () => connect(context, d.deviceId)),
-              ],
-            ),
-        ],
-      ),
+            const SizedBox(width: 16),
+            // 操作按钮：本机不展示控制按钮
+            if (!isLocalDevice)
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _buildActionButton('连接', MyTheme.accent, Colors.white,
+                      () => connect(context, d.deviceId)),
+                  _buildActionButton(
+                      '文件传输',
+                      Colors.grey.shade100,
+                      Colors.grey.shade800,
+                      () => connect(context, d.deviceId, isFileTransfer: true)),
+                  _buildActionButton('观看', Colors.grey.shade100,
+                      Colors.grey.shade800, () => connect(context, d.deviceId)),
+                  _buildActionButton('协作', Colors.grey.shade100,
+                      Colors.grey.shade800, () => connect(context, d.deviceId)),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -3012,7 +3044,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     final selected = _selectedPeer != null && _selectedPeer!.id == p.id;
     return GestureDetector(
       onTap: () => _selectPeer(p),
-      onSecondaryTapUp: (details) => _showPeerContextMenu(context, p, details.globalPosition),
+      onSecondaryTapUp: (details) =>
+          _showPeerContextMenu(context, p, details.globalPosition),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -3024,58 +3057,65 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
               width: selected ? 2 : 1),
         ),
         child: Row(
-        children: [
-          // 在线状态点
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: online ? Colors.green : Colors.grey.shade400,
-              shape: BoxShape.circle,
+          children: [
+            // 在线状态点
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: online ? Colors.green : Colors.grey.shade400,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          // 平台图标
-          Icon(Icons.computer,
-              size: 28, color: online ? MyTheme.accent : Colors.grey),
-          const SizedBox(width: 14),
-          // 名称与设备码
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 12),
+            // 平台图标
+            Icon(Icons.computer,
+                size: 28, color: online ? MyTheme.accent : Colors.grey),
+            const SizedBox(width: 14),
+            // 名称与设备码
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name,
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(formatID(id),
+                      style:
+                          TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // 操作按钮
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
               children: [
-                Text(name,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text(formatID(id),
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.grey.shade600)),
+                _buildActionButton('连接', MyTheme.accent, Colors.white,
+                    () => _connectAndSyncToCloud(context, p)),
+                _buildActionButton(
+                    '文件传输',
+                    Colors.grey.shade100,
+                    Colors.grey.shade800,
+                    () => _connectAndSyncToCloud(context, p,
+                        isFileTransfer: true)),
+                _buildActionButton(
+                    '观看',
+                    Colors.grey.shade100,
+                    Colors.grey.shade800,
+                    () => _connectAndSyncToCloud(context, p)),
+                _buildActionButton(
+                    '协作',
+                    Colors.grey.shade100,
+                    Colors.grey.shade800,
+                    () => _connectAndSyncToCloud(context, p)),
               ],
             ),
-          ),
-          const SizedBox(width: 16),
-          // 操作按钮
-          Wrap(
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              _buildActionButton('连接', MyTheme.accent, Colors.white,
-                  () => _connectAndSyncToCloud(context, p)),
-              _buildActionButton('文件传输', Colors.grey.shade100,
-                  Colors.grey.shade800,
-                  () => _connectAndSyncToCloud(context, p, isFileTransfer: true)),
-              _buildActionButton('观看', Colors.grey.shade100,
-                  Colors.grey.shade800,
-                  () => _connectAndSyncToCloud(context, p)),
-              _buildActionButton('协作', Colors.grey.shade100,
-                  Colors.grey.shade800,
-                  () => _connectAndSyncToCloud(context, p)),
-            ],
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -3139,7 +3179,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
   void _showDeviceContextMenu(
       BuildContext context, JilianDevice d, Offset position) {
     final localId = trimID(gFFI.serverModel.serverId.text);
-    final isLocal = d.deviceId == localId || formatID(d.deviceId) == formatID(localId);
+    final isLocal =
+        d.deviceId == localId || formatID(d.deviceId) == formatID(localId);
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -3179,8 +3220,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     );
   }
 
-  void _showPeerContextMenu(
-      BuildContext context, Peer p, Offset position) {
+  void _showPeerContextMenu(BuildContext context, Peer p, Offset position) {
     showMenu(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -3210,8 +3250,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                   : (p.username.isNotEmpty && p.hostname.isNotEmpty
                       ? '${p.username}@${p.hostname}'
                       : (p.hostname.isNotEmpty ? p.hostname : '远程设备'));
-              final res = await jilianApi.bindPeerDevice(
-                  p.id, name, platform: p.platform, alias: p.alias);
+              final res = await jilianApi.bindPeerDevice(p.id, name,
+                  platform: p.platform, alias: p.alias);
               if (res['code'] == 0) {
                 showToast('已添加到我的设备');
                 if (mounted) await _loadDevices();
@@ -3254,7 +3294,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     gFFI.dialogManager.show((setState, close, ctx) {
       return CustomAlertDialog(
         title: const Text('删除设备'),
-        content: Text('确定从「我的设备」中删除 ${d.deviceAlias.isNotEmpty ? d.deviceAlias : formatID(d.deviceId)} 吗？'),
+        content: Text(
+            '确定从「我的设备」中删除 ${d.deviceAlias.isNotEmpty ? d.deviceAlias : formatID(d.deviceId)} 吗？'),
         onCancel: close,
         onSubmit: () async {
           final res = await jilianApi.unbindDevice(d.deviceId);
@@ -3420,8 +3461,7 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
               Icon(icon, size: 56, color: MyTheme.accent),
               const SizedBox(height: 12),
               Text('扫码登录',
-                  style: TextStyle(
-                      fontSize: 13, color: Colors.grey.shade600)),
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
             ],
           ),
         ),
@@ -3583,9 +3623,8 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
               )),
         const SizedBox(height: 12),
         TextField(
-          controller: _accountPwdTab.value == 0
-              ? _pwdController
-              : _emailPwdController,
+          controller:
+              _accountPwdTab.value == 0 ? _pwdController : _emailPwdController,
           obscureText: true,
           decoration: InputDecoration(
             prefixIcon: const Icon(Icons.lock_outline),
@@ -3660,8 +3699,7 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
     );
   }
 
-  Widget _buildPasswordInput(
-      TextEditingController controller, String hint) {
+  Widget _buildPasswordInput(TextEditingController controller, String hint) {
     return TextField(
       controller: controller,
       obscureText: true,
@@ -3830,10 +3868,10 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
                   Obx(() => SizedBox(
                         width: 110,
                         child: ElevatedButton(
-                          onPressed: (_regSending.value ||
-                                  _regCountdown.value > 0)
-                              ? null
-                              : _regSendCode,
+                          onPressed:
+                              (_regSending.value || _regCountdown.value > 0)
+                                  ? null
+                                  : _regSendCode,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: MyTheme.accent,
                             foregroundColor: Colors.white,
@@ -3860,8 +3898,7 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('注册并登录',
-                      style: TextStyle(fontSize: 15)),
+                  child: const Text('注册并登录', style: TextStyle(fontSize: 15)),
                 ),
               ),
             ] else ...[
@@ -3889,8 +3926,7 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text('注册并登录',
-                      style: TextStyle(fontSize: 15)),
+                  child: const Text('注册并登录', style: TextStyle(fontSize: 15)),
                 ),
               ),
             ],
@@ -3915,7 +3951,8 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.computer, color: Color(0xFF2196F3), size: 26),
+                child: const Icon(Icons.computer,
+                    color: Color(0xFF2196F3), size: 26),
               ),
               const SizedBox(width: 12),
               const Column(
@@ -3988,8 +4025,8 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
                     unselectedLabelColor: Colors.grey.shade600,
                     indicatorColor: MyTheme.accent,
                     indicatorSize: TabBarIndicatorSize.label,
-                    labelStyle:
-                        const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    labelStyle: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600),
                     unselectedLabelStyle: const TextStyle(fontSize: 14),
                     tabs: const [
                       Tab(text: '手机验证登录'),
@@ -4375,18 +4412,30 @@ class _JilianScreenWallPageState extends State<_JilianScreenWallPage> {
                           fontSize: 13, fontWeight: FontWeight.w600),
                       overflow: TextOverflow.ellipsis),
                 ),
-                InkWell(
-                  onTap: () => _removeDevice(id),
-                  child: Icon(Icons.close,
-                      size: 16, color: Colors.grey.shade600),
+                Tooltip(
+                  message: '打开完整远程窗口',
+                  child: InkWell(
+                    onTap: () => connect(context, id),
+                    child: Icon(Icons.open_in_new,
+                        size: 16, color: Colors.grey.shade600),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Tooltip(
+                  message: '从屏幕墙移除',
+                  child: InkWell(
+                    onTap: () => _removeDevice(id),
+                    child: Icon(Icons.close,
+                        size: 16, color: Colors.grey.shade600),
+                  ),
                 ),
               ],
             ),
           ),
           Expanded(
             child: MiniRemoteView(
+              key: ValueKey('screen_wall_$id'),
               id: id,
-              onDoubleTap: () => connect(context, id),
             ),
           ),
         ],

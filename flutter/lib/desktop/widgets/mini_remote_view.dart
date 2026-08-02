@@ -37,8 +37,8 @@ class _MiniRemoteViewState extends State<MiniRemoteView> {
   late final RxBool _keyboardEnabled;
   final _cursorOverImage = false.obs;
   Timer? _connectTimeoutTimer;
-  bool _closed = false;
   bool _firstImage = false;
+  Size? _lastSize;
 
   @override
   void initState() {
@@ -53,8 +53,12 @@ class _MiniRemoteViewState extends State<MiniRemoteView> {
     _keyboardEnabled = KeyboardEnabledState.find(id);
     _remoteCursorMoved = RemoteCursorMovedState.find(id);
 
-    _ffi.imageModel.addCallbackOnFirstImage((String peerId) {
+    _ffi.imageModel.addCallbackOnFirstImage((String peerId) async {
       _firstImage = true;
+      // 缩略画面固定用自适应缩放，保证整个远程桌面铺满小窗格
+      await bind.sessionSetViewStyle(
+          sessionId: _ffi.sessionId, value: kRemoteViewStyleAdaptive);
+      await _ffi.canvasModel.updateViewStyle();
       _ffi.canvasModel.activateLocalCursor();
       if (mounted) setState(() {});
     });
@@ -75,13 +79,12 @@ class _MiniRemoteViewState extends State<MiniRemoteView> {
 
   @override
   void dispose() {
-    _closed = true;
     _connectTimeoutTimer?.cancel();
-    try {
-      bind.sessionClose(sessionId: _ffi.sessionId);
-    } catch (e) {
+    _ffi.canvasModel.setForcedSize(null);
+    // close() 内部已经调用 bind.sessionClose，不要重复关闭
+    _ffi.close(closeSession: true).catchError((e) {
       debugPrint('MiniRemoteView close error: $e');
-    }
+    });
     Get.delete<FFI>(tag: _ffi.sessionId.toString(), force: true);
     super.dispose();
   }
@@ -112,9 +115,18 @@ class _MiniRemoteViewState extends State<MiniRemoteView> {
       ],
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // 让画布尺寸与容器一致
-          _ffi.canvasModel.setSize(constraints.biggest);
-          _ffi.canvasModel.updateViewStyle();
+          // 让画布尺寸与容器一致；只在尺寸变化时更新，且延后到帧末，
+          // 避免在 build 过程中触发 notifyListeners 导致断言崩溃。
+          final size = constraints.biggest;
+          if (_lastSize != size && size.width > 0 && size.height > 0) {
+            _lastSize = size;
+            _ffi.canvasModel.setForcedSize(size);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _ffi.canvasModel.updateViewStyle();
+              }
+            });
+          }
 
           return GestureDetector(
             onDoubleTap: widget.onDoubleTap,

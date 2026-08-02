@@ -2292,6 +2292,11 @@ class CanvasModel with ChangeNotifier {
       isDesktop ? windowBorderWidth + kDragToResizeAreaPadding.bottom : 0;
 
   Size getSize() {
+    // 内嵌视图（屏幕墙）强制使用宿主容器尺寸
+    final forced = _forcedSize;
+    if (forced != null) {
+      return forced;
+    }
     final mediaData = MediaQueryData.fromView(ui.window);
     final size = mediaData.size;
     // If minimized, w or h may be negative here.
@@ -2337,8 +2342,14 @@ class CanvasModel with ChangeNotifier {
 
   updateSize() => _size = getSize();
 
-  /// 供屏幕墙等内嵌视图使用，强制指定画布尺寸（替代默认的窗口尺寸）。
-  setSize(Size size) => _size = size;
+  /// 屏幕墙等内嵌视图使用：强制画布尺寸为宿主容器尺寸，而不是整个窗口尺寸。
+  /// 置空则恢复默认（按窗口尺寸计算）。
+  Size? _forcedSize;
+
+  void setForcedSize(Size? size) {
+    _forcedSize = size;
+    _size = getSize();
+  }
 
   updateViewStyle({refreshMousePos = true, notify = true}) async {
     final style = await bind.sessionGetViewStyle(sessionId: sessionId);
