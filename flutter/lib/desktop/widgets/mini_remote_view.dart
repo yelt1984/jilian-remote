@@ -11,6 +11,8 @@ import '../../consts.dart';
 import '../../models/model.dart';
 import '../../models/platform_model.dart';
 import '../pages/remote_page.dart';
+import 'package:flutter/gestures.dart';
+import '../../common/shared_state.dart';
 
 /// 屏幕墙用的小型远程视图：只渲染画面并转发输入，不创建独立窗口/标签页。
 class MiniRemoteView extends StatefulWidget {
