@@ -1493,7 +1493,8 @@ class _JilianProfileContentState extends State<_JilianProfileContent> {
           showToast('无法读取头像文件');
           return;
         }
-        return _uploadAvatarBytes(fileBytes, file.extension ?? 'png');
+        await _uploadAvatarBytes(fileBytes, file.extension ?? 'png');
+        return;
       }
       if (bytes.length > 3 * 1024 * 1024) {
         showToast('头像过大(最大3MB)');
