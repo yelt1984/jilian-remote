@@ -1005,6 +1005,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           call.arguments['id'],
           isFileTransfer: call.arguments['isFileTransfer'],
           isViewCamera: call.arguments['isViewCamera'],
+          isTerminal: call.arguments['isTerminal'] ?? false,
           isTcpTunneling: call.arguments['isTcpTunneling'],
           isRDP: call.arguments['isRDP'],
           password: call.arguments['password'],
@@ -1105,12 +1106,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 }
 
 void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
-  final pw = await bind.mainGetPermanentPassword();
-  final p0 = TextEditingController(text: pw);
-  final p1 = TextEditingController(text: pw);
+  final p0 = TextEditingController();
+  final p1 = TextEditingController();
   var errMsg0 = "";
   var errMsg1 = "";
-  final RxString rxPass = pw.trim().obs;
+  final RxString rxPass = "".obs;
   final rules = [
     DigitValidationRule(),
     UppercaseValidationRule(),
@@ -1144,8 +1144,8 @@ void setPasswordDialog({VoidCallback? notEmptyCallback}) async {
         });
         return;
       }
-      bind.mainSetPermanentPassword(password: pass);
-      if (pass.isNotEmpty) {
+      final ok = await bind.mainSetPermanentPasswordWithResult(password: pass);
+      if (ok && pass.isNotEmpty) {
         notEmptyCallback?.call();
       }
       close();
