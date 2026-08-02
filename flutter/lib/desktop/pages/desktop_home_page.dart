@@ -12,6 +12,8 @@ import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_tab_page.dart';
+import 'package:flutter_hbb/desktop/widgets/mini_remote_view.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/jilian_api.dart';
@@ -30,6 +32,7 @@ import '../../common/widgets/autocomplete.dart';
 import '../../models/peer_model.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
+import 'package:uuid/uuid.dart';
 
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
@@ -409,17 +412,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget _buildScreenWallPage(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.grid_view_outlined, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          Text('屏幕墙功能即将上线',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-        ],
-      ),
-    );
+    return const _JilianScreenWallPage();
   }
 
   buildIDBoard(BuildContext context) {
@@ -2435,50 +2428,134 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     );
   }
 
-  /// 远程电源操作：RustDesk 开源核心没有「无会话一键电源」接口，
-  /// 这里先打开远程桌面，并提示用户在工具栏中使用对应功能。
+  /// 远程电源操作：后台静默建立会话，连接成功后立即发送电源指令并关闭会话。
+  /// 不再需要打开远程桌面窗口，也不再依赖工具栏二次操作。
   void _doRemotePowerOp(BuildContext context, String id, String name, String type) {
-    String action;
-    switch (type) {
-      case 'lock':
-        action = '锁屏';
-        break;
-      case 'restart':
-        action = '重启';
-        break;
-      case 'shutdown':
-        action = '关机';
-        break;
-      default:
-        return;
+    final action = type == 'lock'
+        ? '锁屏'
+        : type == 'restart'
+            ? '重启'
+            : type == 'shutdown'
+                ? '关机'
+                : '';
+    if (action.isEmpty) return;
+
+    if (type == 'lock') {
+      // 锁屏是非破坏性操作，直接执行
+      _executeSilentRemotePowerOp(id, name, type);
+      return;
     }
+
+    // 重启/关机需要二次确认
     gFFI.dialogManager.show((setState, close, ctx) {
       return CustomAlertDialog(
-        title: Row(children: [
-          Icon(Icons.warning_rounded, color: Colors.orange, size: 24),
-          Text(' 确认$action远程设备').paddingOnly(left: 8),
-        ]),
-        content: Text(
-          type == 'shutdown'
-              ? 'RustDesk 开源核心未提供「远程一键关机」接口，无法直接对 "$name" 执行关机。\n\n请点击下方「打开远程桌面」，进入系统后通过开始菜单关机。'
-              : '即将对 "$name" 执行$action。\n\n连接成功后会自动执行，无需再点任何工具栏按钮。',
-        ),
+        title: Text('确认$action远程设备？'),
+        content: Text('即将对 "$name" 执行$action，未保存的工作可能会丢失。'),
         actions: [
           dialogButton('取消', onPressed: close, isOutline: true),
-          dialogButton(type == 'shutdown' ? '打开远程桌面' : '确认$action',
-              onPressed: () {
+          dialogButton('确定', onPressed: () {
             close();
-            if (type == 'shutdown') {
-              connect(context, id);
-              showToast('请在远程窗口中通过开始菜单关机');
-            } else {
-              showToast('正在连接 $name 并执行$action...');
-              connect(context, id, autoPowerAction: type);
-            }
+            _executeSilentRemotePowerOp(id, name, type);
           }),
         ],
       );
     });
+  }
+
+  /// 静默执行远程电源指令。创建临时会话，不打开远程窗口。
+  void _executeSilentRemotePowerOp(String rawId, String name, String type) {
+    final action = type == 'lock'
+        ? '锁屏'
+        : type == 'restart'
+            ? '重启'
+            : '关机';
+    final id = rawId.replaceAll(' ', '');
+    showToast('正在向 "$name" 发送$action指令...');
+
+    final sessionId = Uuid().v4obj();
+    StreamSubscription? sub;
+    var executed = false;
+    var disposed = false;
+
+    void cleanup() async {
+      if (disposed) return;
+      disposed = true;
+      await sub?.cancel();
+      try {
+        await bind.sessionClose(sessionId: sessionId);
+      } catch (_) {}
+    }
+
+    void onError(String msg) {
+      showToast(msg);
+      cleanup();
+    }
+
+    try {
+      final addRes = bind.sessionAddSync(
+        sessionId: sessionId,
+        id: id,
+        isFileTransfer: false,
+        isViewCamera: false,
+        isPortForward: false,
+        isRdp: false,
+        isTerminal: false,
+        switchUuid: '',
+        forceRelay: false,
+        password: '',
+        isSharedPassword: false,
+      );
+      if (addRes.isNotEmpty) {
+        onError('创建会话失败: $addRes');
+        return;
+      }
+
+      final stream = bind.sessionStart(sessionId: sessionId, id: id);
+      sub = stream.listen((evt) async {
+        final eventName = evt['name'];
+        if (eventName == 'connection_ready' || eventName == 'peer_info') {
+          if (executed) return;
+          executed = true;
+          await Future.delayed(const Duration(milliseconds: 500));
+          switch (type) {
+            case 'lock':
+              await bind.sessionLockScreen(sessionId: sessionId);
+              break;
+            case 'restart':
+              await bind.sessionRestartRemoteDevice(sessionId: sessionId);
+              break;
+            case 'shutdown':
+              await bind.sessionShutdownRemoteDevice(sessionId: sessionId);
+              break;
+          }
+          showToast('已向 "$name" 发送$action指令');
+          await Future.delayed(const Duration(seconds: 2));
+          cleanup();
+        } else if (eventName == 'msgbox') {
+          final msgType = evt['type'];
+          final title = evt['title']?.toString() ?? '';
+          final text = evt['text']?.toString() ?? '';
+          if (msgType == 'input-password' ||
+              msgType == 're-input-password' ||
+              (title.contains('Connection Error') && text.contains('offline'))) {
+            onError('"$name" 需要访问密码或已离线，$action指令未执行');
+          } else if (msgType == 'error' || title.contains('Connection Error')) {
+            onError('连接 "$name" 失败，$action指令未执行');
+          }
+        }
+      }, onError: (e) {
+        onError('连接 "$name" 失败: $e');
+      });
+
+      // 15 秒超时兜底
+      Future.delayed(const Duration(seconds: 15), () {
+        if (!executed && !disposed) {
+          onError('"$name" 未响应，$action指令未执行');
+        }
+      });
+    } catch (e) {
+      onError('操作失败: $e');
+    }
   }
 
   Widget _buildLocalDetailPanel(String id) {
@@ -3984,6 +4061,334 @@ class _JilianLoginContentState extends State<_JilianLoginContent>
           ),
           // 右侧品牌面板
           _buildBrandPanel(),
+        ],
+      ),
+    );
+  }
+}
+
+class _JilianScreenWallPage extends StatefulWidget {
+  const _JilianScreenWallPage({Key? key}) : super(key: key);
+
+  @override
+  State<_JilianScreenWallPage> createState() => _JilianScreenWallPageState();
+}
+
+class _JilianScreenWallPageState extends State<_JilianScreenWallPage> {
+  List<JilianDevice> _allDevices = [];
+  final List<Map<String, dynamic>> _screenDevices = [];
+  bool _loading = false;
+  String? _error;
+  static const _prefKey = 'jilian_screen_wall_devices';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadScreenWallDevices();
+    _loadAllDevices();
+  }
+
+  Future<void> _loadScreenWallDevices() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefKey);
+      if (raw != null && raw.isNotEmpty) {
+        final list = jsonDecode(raw) as List;
+        if (mounted) {
+          setState(() {
+            _screenDevices.clear();
+            for (final item in list) {
+              if (item is Map) {
+                _screenDevices.add({
+                  'id': item['id']?.toString() ?? '',
+                  'name': item['name']?.toString() ?? '',
+                  'platform': item['platform']?.toString() ?? '',
+                });
+              }
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('load screen wall devices error: $e');
+    }
+  }
+
+  Future<void> _saveScreenWallDevices() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefKey, jsonEncode(_screenDevices));
+    } catch (e) {
+      debugPrint('save screen wall devices error: $e');
+    }
+  }
+
+  Future<void> _loadAllDevices() async {
+    if (!jilianApi.isLoggedIn) return;
+    if (mounted) setState(() => _loading = true);
+    try {
+      final list = await jilianApi.getDeviceList();
+      if (mounted) {
+        setState(() {
+          _allDevices = list;
+          _error = null;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = '加载失败：$e';
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  bool _isMobile(String? platform) {
+    final p = (platform ?? '').toLowerCase();
+    return p == 'android' || p == 'ios';
+  }
+
+  void _showAddDeviceDialog() {
+    final localId = trimID(gFFI.serverModel.serverId.text);
+    final candidates = _allDevices.where((d) {
+      final id = trimID(d.deviceId);
+      return id.isNotEmpty &&
+          id != localId &&
+          !_isMobile(d.platform) &&
+          !_screenDevices.any((s) => trimID(s['id']) == id);
+    }).toList();
+
+    if (candidates.isEmpty) {
+      showToast('暂无可添加的电脑设备');
+      return;
+    }
+
+    final selected = <String>{};
+    gFFI.dialogManager.show((setState, close, ctx) {
+      return CustomAlertDialog(
+        title: const Text('添加屏幕墙设备'),
+        content: SizedBox(
+          width: 400,
+          height: 300,
+          child: StatefulBuilder(
+            builder: (context, setLocalState) {
+              return ListView.builder(
+                itemCount: candidates.length,
+                itemBuilder: (context, index) {
+                  final d = candidates[index];
+                  final id = trimID(d.deviceId);
+                  final name = d.deviceName.isNotEmpty ? d.deviceName : id;
+                  final checked = selected.contains(id);
+                  return CheckboxListTile(
+                    value: checked,
+                    onChanged: (v) {
+                      setLocalState(() {
+                        if (v == true) {
+                          selected.add(id);
+                        } else {
+                          selected.remove(id);
+                        }
+                      });
+                    },
+                    title: Text(name,
+                        style: const TextStyle(fontSize: 14),
+                        overflow: TextOverflow.ellipsis),
+                    subtitle: Text(id,
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade500)),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    dense: true,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          dialogButton('取消', onPressed: close, isOutline: true),
+          dialogButton('添加', onPressed: () {
+            close();
+            for (final d in candidates) {
+              final id = trimID(d.deviceId);
+              if (selected.contains(id)) {
+                _addDevice(d);
+              }
+            }
+          }),
+        ],
+      );
+    });
+  }
+
+  void _addDevice(JilianDevice d) {
+    final id = trimID(d.deviceId);
+    if (id.isEmpty) return;
+    setState(() {
+      _screenDevices.add({
+        'id': id,
+        'name': d.deviceName.isNotEmpty ? d.deviceName : id,
+        'platform': d.platform,
+      });
+    });
+    _saveScreenWallDevices();
+  }
+
+  void _removeDevice(String id) {
+    final keyId = trimID(id);
+    setState(() {
+      _screenDevices.removeWhere((s) => trimID(s['id']) == keyId);
+    });
+    _saveScreenWallDevices();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!jilianApi.isLoggedIn) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.grid_view_outlined,
+                size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text('请先登录极连账号以使用屏幕墙',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
+    if (_screenDevices.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return _buildGrid();
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.desktop_windows_outlined,
+              size: 72, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text('未添加设备',
+              style: TextStyle(
+                  color: Colors.grey.shade800,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text('点击「添加设备」按钮，添加屏幕墙设备',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _showAddDeviceDialog,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('添加设备'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: MyTheme.accent,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGrid() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Text('屏幕墙 · 监控 ${_screenDevices.length} 台电脑',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const Spacer(),
+              ElevatedButton.icon(
+                onPressed: _showAddDeviceDialog,
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('添加设备'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: MyTheme.accent,
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 420,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 16 / 10,
+            ),
+            itemCount: _screenDevices.length,
+            itemBuilder: (context, index) {
+              final d = _screenDevices[index];
+              return _buildDeviceTile(d);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDeviceTile(Map<String, dynamic> d) {
+    final id = trimID(d['id']);
+    final name = (d['name'] ?? id).toString();
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            color: Colors.grey.shade100,
+            child: Row(
+              children: [
+                Icon(Icons.desktop_windows,
+                    size: 16, color: Colors.grey.shade700),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(name,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis),
+                ),
+                InkWell(
+                  onTap: () => _removeDevice(id),
+                  child: Icon(Icons.close,
+                      size: 16, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: MiniRemoteView(
+              id: id,
+              onDoubleTap: () => connect(context, id),
+            ),
+          ),
         ],
       ),
     );

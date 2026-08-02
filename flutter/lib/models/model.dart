@@ -2337,6 +2337,9 @@ class CanvasModel with ChangeNotifier {
 
   updateSize() => _size = getSize();
 
+  /// 供屏幕墙等内嵌视图使用，强制指定画布尺寸（替代默认的窗口尺寸）。
+  setSize(Size size) => _size = size;
+
   updateViewStyle({refreshMousePos = true, notify = true}) async {
     final style = await bind.sessionGetViewStyle(sessionId: sessionId);
     if (style == null) {
