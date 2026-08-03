@@ -119,11 +119,12 @@ class PasswordStrengthIndicator extends StatelessWidget {
 
   Color _getColor(double strength) {
     if (strength < weakMedium) {
-      return Colors.yellow;
+      // 极连远程：弱档不再用 Material 默认黄色，改品牌蓝 40%（避免"黄线"观感）
+      return MyTheme.accent.withOpacity(0.4);
     } else if (strength < mediumStrong) {
-      return Colors.blue;
+      return MyTheme.accent.withOpacity(0.7);
     } else {
-      return Colors.green;
+      return MyTheme.accent;
     }
   }
 }

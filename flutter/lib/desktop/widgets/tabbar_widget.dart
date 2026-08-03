@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -432,7 +433,15 @@ class _DesktopTabState extends State<DesktopTab>
 
   @override
   void onWindowClose() async {
-    mainWindowClose() async => await windowManager.hide();
+    // 极连远程：主窗口点系统标题栏 X = 真正退出程序（用户反馈"点了关闭但程序还在"）。
+    // 不再仅隐藏到托盘；与首页自绘关闭按钮行为保持一致。
+    mainWindowClose() async {
+      if (isWindows) {
+        exit(0);
+      } else {
+        await windowManager.hide();
+      }
+    }
     notMainWindowClose(WindowController windowController) async {
       if (controller.length != 0) {
         debugPrint("close not empty multiwindow from taskbar");

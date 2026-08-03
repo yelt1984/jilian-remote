@@ -251,17 +251,17 @@ class MyTheme {
   MyTheme._();
 
   static const Color grayBg = Color(0xFFEFEFF2);
-  // ToDesk 橙色主题
-  static const Color accent = Color(0xFFFF6A00);
-  static const Color accent50 = Color(0x77FF6A00);
-  static const Color accent80 = Color(0xAAFF6A00);
+  // 极连远程：主题色改为蓝色，去除橙/黄色高亮与下划线
+  static const Color accent = Color(0xFF1E6FFF);
+  static const Color accent50 = Color(0x771E6FFF);
+  static const Color accent80 = Color(0xAA1E6FFF);
   static const Color canvasColor = Color(0xFF212121);
   static const Color border = Color(0xFFCCCCCC);
   static const Color idColor = Color(0xFF00B6F0);
   static const Color darkGray = Color.fromARGB(255, 148, 148, 148);
   static const Color cmIdColor = Color(0xFF21790B);
   static const Color dark = Colors.black87;
-  static const Color button = Color(0xFFFF7A1A);
+  static const Color button = Color(0xFF1E6FFF);
   static const Color hoverBorder = Color(0xFF999999);
 
   // ListTile
@@ -374,11 +374,38 @@ class MyTheme {
 
   static ThemeData lightTheme = ThemeData(
     // https://stackoverflow.com/questions/77537315/after-upgrading-to-flutter-3-16-the-app-bar-background-color-button-size-and
-    useMaterial3: false,
+    useMaterial3: true,
     brightness: Brightness.light,
+    // 极连远程：以蓝色为种子色生成整套 ColorScheme，所有派生色（Switch/Card tint 等）
+    // 都从蓝色派系生成，避免 Material 默认的 amber/yellow 染色（这是用户看到的"黄色横线"真凶）
+    colorSchemeSeed: accent,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: accent,
+      brightness: Brightness.light,
+      primary: accent,
+      secondary: accent,
+      surface: Colors.white,
+    ).copyWith(
+      // 禁用 Card / AppBar 在 M3 下的 surfaceTint 染色（避免浅蓝偏黄）
+      surfaceTint: Colors.transparent,
+    ),
     hoverColor: Color.fromARGB(255, 224, 224, 224),
     scaffoldBackgroundColor: Colors.white,
     dialogBackgroundColor: Colors.white,
+    cardTheme: CardTheme(
+      // 取消 Card 表面 tint，Card 不再被 primary 染成蓝/黄
+      surfaceTintColor: Colors.transparent,
+      color: Colors.white,
+      elevation: 0,
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: accent,
+      circularTrackColor: accent.withOpacity(0.15),
+    ),
+    switchTheme: switchTheme(),
+    radioTheme: radioTheme(),
+    checkboxTheme: checkboxTheme,
+    listTileTheme: listTileTheme,
     appBarTheme: AppBarTheme(
       shadowColor: Colors.transparent,
     ),
@@ -398,9 +425,24 @@ class MyTheme {
             fillColor: grayBg,
             filled: true,
             isDense: true,
+            // 强制 outline 边框，禁用 M3 默认黄色 UnderlineInputBorder
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.transparent, width: 0),
             ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: Colors.transparent, width: 0),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: accent, width: 1.5),
+            ),
+            // 禁用 prefixIcon、suffixIcon 的下划线色（避免 M3 amber tint）
+            prefixIconColor: Color(0xFF999999),
+            suffixIconColor: Color(0xFF999999),
+            labelStyle: const TextStyle(color: Color(0xFF666666)),
+            hintStyle: const TextStyle(color: Color(0xFFAAAAAA)),
           )
         : null,
     textTheme: const TextTheme(
@@ -447,15 +489,10 @@ class MyTheme {
         ),
       ),
     ),
-    switchTheme: switchTheme(),
-    radioTheme: radioTheme(),
-    checkboxTheme: checkboxTheme,
-    listTileTheme: listTileTheme,
     menuBarTheme: MenuBarThemeData(
         style:
             MenuStyle(backgroundColor: MaterialStatePropertyAll(Colors.white))),
-    colorScheme: ColorScheme.light(
-        primary: accent, secondary: accent, background: grayBg),
+    // colorScheme 已在前面用 ColorScheme.fromSeed(蓝色种子) 定义 —— 这里不再覆盖
     popupMenuTheme: PopupMenuThemeData(
         color: Colors.white,
         shape: RoundedRectangleBorder(
@@ -3874,14 +3911,15 @@ Widget _buildPresetPasswordWarning() {
     return SizedBox.shrink();
   }
   return Container(
-    color: Colors.yellow,
+    // 极连远程：安全提醒横幅从 Material 黄色改为品牌蓝浅底（消除"黄线"观感）
+    color: MyTheme.accent.withOpacity(0.1),
     child: Column(
       children: [
         Align(
             child: Text(
           translate("Security Alert"),
           style: TextStyle(
-            color: Colors.red,
+            color: MyTheme.accent,
             fontSize:
                 18, // https://github.com/rustdesk/rustdesk-server-pro/issues/261
             fontWeight: FontWeight.bold,
@@ -3889,7 +3927,7 @@ Widget _buildPresetPasswordWarning() {
         )).paddingOnly(bottom: 8),
         Text(
           translate("preset_password_warning"),
-          style: TextStyle(color: Colors.red),
+          style: TextStyle(color: MyTheme.accent),
         )
       ],
     ).paddingAll(8),

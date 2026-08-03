@@ -36,6 +36,91 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
 import 'package:uuid/uuid.dart';
 
+/// 极连远程：应用内窗口控制按钮（最小化 / 最大化还原 / 关闭）
+/// 作为系统标题栏的兜底，保证任何情况下用户都能操作窗口。
+class _JilianWindowButtons extends StatefulWidget {
+  const _JilianWindowButtons({Key? key}) : super(key: key);
+
+  @override
+  State<_JilianWindowButtons> createState() => _JilianWindowButtonsState();
+}
+
+class _JilianWindowButtonsState extends State<_JilianWindowButtons> {
+  bool _isMaximized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncMaximized();
+  }
+
+  Future<void> _syncMaximized() async {
+    try {
+      final m = await windowManager.isMaximized();
+      if (mounted && m != _isMaximized) setState(() => _isMaximized = m);
+    } catch (_) {}
+  }
+
+  Widget _btn(IconData icon, String tip, VoidCallback onTap,
+      {bool danger = false}) {
+    return Tooltip(
+      message: tip,
+      child: InkWell(
+        onTap: onTap,
+        hoverColor: danger ? Colors.red.withOpacity(0.15) : Colors.black12,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          width: 44,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon,
+              size: 16,
+              color: danger
+                  ? Colors.red.shade400
+                  : Theme.of(context).textTheme.titleLarge?.color),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _btn(Icons.remove, '最小化', () async {
+            await windowManager.minimize();
+          }),
+          _btn(_isMaximized ? Icons.filter_none : Icons.crop_square,
+              _isMaximized ? '还原' : '最大化', () async {
+            if (await windowManager.isMaximized()) {
+              await windowManager.unmaximize();
+            } else {
+              await windowManager.maximize();
+            }
+            await _syncMaximized();
+          }),
+          _btn(Icons.close, '关闭', () {
+            // 极连远程：点击关闭 = 真正退出程序（与首页 Quit 行为一致），
+            // 不再只是隐藏到托盘（用户反馈"点了关闭但程序还在"）。
+            if (isWindows) {
+              exit(0);
+            } else {
+              SystemNavigator.pop();
+            }
+          }, danger: true),
+        ],
+      ),
+    );
+  }
+}
+
 class DesktopHomePage extends StatefulWidget {
   const DesktopHomePage({Key? key}) : super(key: key);
 
@@ -295,7 +380,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           // 版本号，方便用户确认当前运行的是哪个版本
           Center(
             child: Text(
-              'v35',
+              'v37',
               style: TextStyle(
                 color: Colors.grey.shade500,
                 fontSize: 11,
@@ -396,22 +481,34 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   Widget buildRightPane(BuildContext context) {
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
-      child: Obx(() {
-        switch (_selectedIndex.value) {
-          case 0:
-            return const _JilianConnectionHomePage();
-          case 1:
-            return _buildDeviceListPage(context);
-          case 2:
-            return _buildScreenWallPage(context);
-          case 3:
-            return DesktopSettingPage(
-                key: const ValueKey('jilian-settings'),
-                initialTabkey: SettingsTabKey.general);
-          default:
-            return const _JilianConnectionHomePage();
-        }
-      }),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Obx(() {
+              switch (_selectedIndex.value) {
+                case 0:
+                  return const _JilianConnectionHomePage();
+                case 1:
+                  return _buildDeviceListPage(context);
+                case 2:
+                  return _buildScreenWallPage(context);
+                case 3:
+                  return DesktopSettingPage(
+                      key: const ValueKey('jilian-settings'),
+                      initialTabkey: SettingsTabKey.general);
+                default:
+                  return const _JilianConnectionHomePage();
+              }
+            }),
+          ),
+          // 极连远程：应用内窗口控制按钮（兜底），即使系统标题栏异常也能最小化/最大化/关闭
+          Positioned(
+            top: 0,
+            right: 0,
+            child: const _JilianWindowButtons(),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2472,6 +2569,8 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     if (action.isEmpty) return;
 
     void doConnect() {
+      // 极连远程：先给出即时反馈，避免建连过程中用户以为"点了没反应"
+      showToast('正在连接 $name，准备执行$action...');
       connect(context, id, autoPowerAction: type);
     }
 
@@ -2666,7 +2765,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
               spacing: 14,
               runSpacing: 14,
               children: [
-                _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
+                _buildBigAction(Icons.folder_copy, '文件中心', const Color(0xFF1E6FFF),
                     () => _showFileCenterNotice(context)),
                 _buildBigAction(Icons.sports_esports, '游戏与应用中心',
                     Colors.deepOrange, () => _showGameCenterNotice(context)),
@@ -2945,7 +3044,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isLocalDevice ? Colors.orange.shade50 : Colors.white,
+          color: isLocalDevice ? const Color(0xFFEAF2FF) : Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
               color: selected
@@ -4477,6 +4576,8 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
   bool _allowControl = true;
   bool _requireLockPassword = false;
   String _password = '';
+  // 极连远程：当前连接验证方式（所有密码 / 仅临时 / 仅固定）
+  String _verificationMethod = kUseBothPasswords;
   bool _obscurePassword = true;
   Timer? _refreshTimer;
 
@@ -4529,13 +4630,26 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
   Future<void> _ensureServiceAndPasswordConfig() async {
     await start_service(true);
     await mainSetBoolOption(kOptionStopService, false);
-    final method = await bind.mainGetOption(key: kOptionVerificationMethod);
-    if (method == kUsePermanentPassword || method.isEmpty) {
+    // 极连远程：仅在未配置时兜底为「所有密码」，不覆盖用户在首页下拉里的选择
+    var method = await bind.mainGetOption(key: kOptionVerificationMethod);
+    if (method.isEmpty) {
       await gFFI.serverModel.setVerificationMethod(kUseBothPasswords);
+      method = kUseBothPasswords;
+    }
+    if (mounted && _verificationMethod != method) {
+      setState(() => _verificationMethod = method);
     }
     final approveMode = await bind.mainGetOption(key: kOptionApproveMode);
     if (approveMode == 'click' || approveMode.isEmpty) {
       await gFFI.serverModel.setApproveMode('password');
+    }
+    // 极连远程：默认开启「允许远程重启/关机」权限。
+    // 被控端 connection.rs 用 self.restart 拦截 Restart/ShutdownRemoteDevice 消息，
+    // 该权限默认关闭会导致首页的重启/关机按钮点了完全没反应。
+    final restartPerm =
+        await bind.mainGetOption(key: kOptionEnableRemoteRestart);
+    if (restartPerm != 'Y') {
+      await bind.mainSetOption(key: kOptionEnableRemoteRestart, value: 'Y');
     }
     await gFFI.serverModel.updatePasswordModel();
   }
@@ -4601,9 +4715,11 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
           padding: const EdgeInsets.fromLTRB(28, 12, 28, 8),
           child: _buildTopTabs(context),
         ),
+        // 极连远程：改用 IndexedStack 按当前模式渲染，避免 TabBarView 与自绘顶栏
+        // 不同步导致 4 个选项卡显示同一份内容
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
+          child: IndexedStack(
+            index: _connectMode,
             children: [
               _buildBody(context, 0),
               _buildBody(context, 1),
@@ -4725,17 +4841,7 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Text('连接模式-所有密码',
-                                        style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade600)),
-                                    const SizedBox(width: 4),
-                                    Icon(Icons.arrow_drop_down,
-                                        size: 18, color: Colors.grey.shade600),
-                                  ],
-                                ),
+                                _buildVerificationModeSelector(context),
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [
@@ -4797,6 +4903,16 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                   // 远程控制设备
                   Row(
                     children: [
+                      Icon(
+                          [
+                            Icons.desktop_windows,
+                            Icons.folder_copy,
+                            Icons.visibility,
+                            Icons.groups
+                          ][mode],
+                          size: 18,
+                          color: Theme.of(context).primaryColor),
+                      const SizedBox(width: 6),
                       Text(tabTitles[mode],
                           style: TextStyle(
                               fontSize: 15, fontWeight: FontWeight.w600)),
@@ -4805,6 +4921,27 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                           style: TextStyle(
                               fontSize: 12, color: Colors.grey.shade500)),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  // 极连远程：各模式独立说明，避免 4 个选项卡看起来完全一样
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).primaryColor.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      [
+                        '完整控制对方桌面：键盘、鼠标、剪贴板全部可用，适合远程办公与技术支持。',
+                        '与对方设备互传文件：双栏文件管理器，支持拖拽上传下载，不会打开对方桌面。',
+                        '只看不控：仅接收对方屏幕画面，无法操作，适合远程演示与教学观摩。',
+                        '多人协作：与对方同时在线操作同一桌面，适合联合排障与结对办公。',
+                      ][mode],
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade700, height: 1.5),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -4859,7 +4996,7 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
     final tabs = ['远程控制', '文件传输', '观看模式', '协作模式'];
     return Row(
       children: List.generate(tabs.length, (index) {
-        final selected = _tabController.index == index;
+        final selected = _connectMode == index;
         return Padding(
           padding: const EdgeInsets.only(right: 10),
           child: Material(
@@ -4868,7 +5005,11 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
             child: InkWell(
-              onTap: () => _tabController.animateTo(index),
+              onTap: () {
+                if (_connectMode == index) return;
+                setState(() => _connectMode = index);
+                _tabController.index = index;
+              },
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -4890,6 +5031,59 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
           ),
         );
       }),
+    );
+  }
+
+  /// 极连远程：可点击选择的「连接模式」下拉（真正切换验证方式）
+  Widget _buildVerificationModeSelector(BuildContext context) {
+    const items = [
+      [kUseBothPasswords, '所有密码'],
+      [kUseTemporaryPassword, '仅临时密码'],
+      [kUsePermanentPassword, '仅固定密码'],
+    ];
+    String label = '所有密码';
+    for (final it in items) {
+      if (it[0] == _verificationMethod) label = it[1];
+    }
+    return PopupMenuButton<String>(
+      tooltip: '选择连接验证方式',
+      padding: EdgeInsets.zero,
+      position: PopupMenuPosition.under,
+      itemBuilder: (context) => items
+          .map((it) => PopupMenuItem<String>(
+                value: it[0],
+                child: Row(
+                  children: [
+                    Icon(
+                      _verificationMethod == it[0]
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      size: 16,
+                      color: _verificationMethod == it[0]
+                          ? Theme.of(context).primaryColor
+                          : Colors.grey,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(it[1], style: const TextStyle(fontSize: 13)),
+                  ],
+                ),
+              ))
+          .toList(),
+      onSelected: (v) async {
+        await gFFI.serverModel.setVerificationMethod(v);
+        if (mounted) setState(() => _verificationMethod = v);
+        await Future.delayed(const Duration(milliseconds: 300));
+        await _fetchPassword();
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('连接模式-$label',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          const SizedBox(width: 4),
+          Icon(Icons.arrow_drop_down, size: 18, color: Colors.grey.shade600),
+        ],
+      ),
     );
   }
 
