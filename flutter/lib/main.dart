@@ -426,7 +426,8 @@ WindowOptions getHiddenTitleBarWindowOptions(
     bool? alwaysOnTop}) {
   var defaultTitleBarStyle = TitleBarStyle.hidden;
   // we do not hide titlebar on win7 because of the frame overflow.
-  if (kUseCompatibleUiMode) {
+  // 极连远程：主窗口使用系统标题栏，确保最小化/最大化/关闭按钮始终可用
+  if (kUseCompatibleUiMode || isMainWindow) {
     defaultTitleBarStyle = TitleBarStyle.normal;
   }
   return WindowOptions(

@@ -154,6 +154,9 @@ class _RemotePageState extends State<RemotePage>
       display: widget.display,
       displays: widget.displays,
     );
+    // 极连远程：默认等比例缩放远程画面，避免窗口变小时画面仍按原始尺寸显示
+    bind.sessionSetViewStyle(
+        sessionId: _ffi.sessionId, value: kRemoteViewStyleAdaptive);
 
     // 远程电源一键直达：6s 兜底（即使首帧没来也尝试执行），15s 超时提示
     if (widget.autoPowerAction != null) {

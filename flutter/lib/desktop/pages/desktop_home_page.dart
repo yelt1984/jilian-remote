@@ -167,12 +167,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: MyTheme.accent.withOpacity(0.1),
+                              color: Colors.grey.shade200,
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(isLoggedIn ? '个人版' : '点击登录',
                                 style: TextStyle(
-                                    fontSize: 11, color: MyTheme.accent)),
+                                    fontSize: 11,
+                                    color: Colors.grey.shade600)),
                           ),
                         ],
                       ),
@@ -315,8 +316,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color:
-              selected ? MyTheme.accent.withOpacity(0.1) : Colors.transparent,
+          color: selected ? Colors.grey.shade200 : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
@@ -324,13 +324,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             Icon(icon,
                 size: 20,
                 color: selected
-                    ? MyTheme.accent
+                    ? Theme.of(context).primaryColor
                     : (textColor ?? Colors.grey).withOpacity(0.7)),
             const SizedBox(width: 10),
             Text(label,
                 style: TextStyle(
                     fontSize: 14,
-                    color: selected ? MyTheme.accent : textColor,
+                    color: selected ? Theme.of(context).primaryColor : textColor,
                     fontWeight:
                         selected ? FontWeight.w600 : FontWeight.normal)),
           ],
@@ -2241,7 +2241,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
       isLocal = false;
     }
     return Container(
-      width: 300,
+      width: 420,
       margin: const EdgeInsets.fromLTRB(0, 12, 24, 24),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -2249,10 +2249,9 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.grey.shade200),
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Row(
               children: [
                 Icon(Icons.computer,
@@ -2335,8 +2334,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
               _buildRemoteDetailPanel(context, id, name),
           ],
         ),
-      ),
-    );
+      );
   }
 
   /// 远程设备详情面板：按 ToDesk 风格分块排列
@@ -2386,23 +2384,23 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           spacing: 14,
           runSpacing: 14,
           children: [
-            _buildBigAction(Icons.desktop_windows, '远程控制', MyTheme.accent,
+            _buildBigAction(Icons.desktop_windows, '远程控制', Theme.of(context).primaryColor,
                 () => connect(context, id)),
-            _buildBigAction(Icons.folder_copy, '文件传输', Colors.blueGrey,
+            _buildBigAction(Icons.folder_copy, '文件传输', Theme.of(context).primaryColor,
                 () => connect(context, id, isFileTransfer: true)),
-            _buildBigAction(Icons.terminal, '终端', Colors.blueGrey,
+            _buildBigAction(Icons.terminal, '终端', Theme.of(context).primaryColor,
                 () => _showTerminalNotice(context)),
-            _buildBigAction(Icons.visibility, '观看模式', Colors.blueGrey,
+            _buildBigAction(Icons.visibility, '观看模式', Theme.of(context).primaryColor,
                 () => connect(context, id)),
-            _buildBigAction(Icons.people_alt, '协作模式', Colors.blueGrey,
+            _buildBigAction(Icons.people_alt, '协作模式', Theme.of(context).primaryColor,
                 () => connect(context, id)),
-            _buildBigAction(Icons.videocam, '摄像头', Colors.blueGrey, () {
+            _buildBigAction(Icons.videocam, '摄像头', Theme.of(context).primaryColor, () {
               showToast('正在连接远程摄像头...');
               connect(context, id, isViewCamera: true);
             }),
-            _buildBigAction(Icons.fit_screen, '镜像屏', Colors.blueGrey,
+            _buildBigAction(Icons.fit_screen, '镜像屏', Theme.of(context).primaryColor,
                 () => _showMirrorScreenNotice(context)),
-            _buildBigAction(Icons.open_in_full, '扩展屏', Colors.blueGrey,
+            _buildBigAction(Icons.open_in_full, '扩展屏', Theme.of(context).primaryColor,
                 () => _showExtendScreenNotice(context)),
           ],
         ),
@@ -2413,10 +2411,10 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           spacing: 14,
           runSpacing: 14,
           children: [
-            _buildBigAction(Icons.folder_copy, '文件中心', Colors.orange,
-                () => _openFileCenter(context, id)),
-            _buildBigAction(Icons.sports_esports, '游戏与应用中心', Colors.deepOrange,
-                () => _showGameCenterNotice(context)),
+                _buildBigAction(Icons.folder_copy, '文件中心', Theme.of(context).primaryColor,
+                    () => _openFileCenter(context, id)),
+                _buildBigAction(Icons.sports_esports, '游戏与应用中心', Theme.of(context).primaryColor,
+                    () => _showGameCenterNotice(context)),
           ],
         ),
       ],
@@ -2430,7 +2428,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           width: 4,
           height: 14,
           decoration: BoxDecoration(
-            color: MyTheme.accent,
+            color: Colors.grey.shade400,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -2461,8 +2459,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
     );
   }
 
-  /// 远程电源操作：后台静默建立会话，连接成功后立即发送电源指令并关闭会话。
-  /// 不再需要打开远程桌面窗口，也不再依赖工具栏二次操作。
+  /// 远程电源操作：打开一个远程会话并在首帧到达后自动执行电源指令。
   void _doRemotePowerOp(
       BuildContext context, String id, String name, String type) {
     final action = type == 'lock'
@@ -2474,9 +2471,13 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                 : '';
     if (action.isEmpty) return;
 
+    void doConnect() {
+      connect(context, id, autoPowerAction: type);
+    }
+
     if (type == 'lock') {
       // 锁屏是非破坏性操作，直接执行
-      _executeSilentRemotePowerOp(id, name, type);
+      doConnect();
       return;
     }
 
@@ -2489,7 +2490,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
           dialogButton('取消', onPressed: close, isOutline: true),
           dialogButton('确定', onPressed: () {
             close();
-            _executeSilentRemotePowerOp(id, name, type);
+            doConnect();
           }),
         ],
       );
@@ -2642,7 +2643,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: MyTheme.accent,
+                  backgroundColor: Theme.of(context).primaryColor,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
@@ -4603,17 +4604,27 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: List.generate(
-              4,
-              (_) => _buildBody(context),
-            ),
+            children: [
+              _buildBody(context, 0),
+              _buildBody(context, 1),
+              _buildBody(context, 2),
+              _buildBody(context, 3),
+            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildBody(BuildContext context) {
+  Widget _buildBody(BuildContext context, int mode) {
+    final tabTitles = ['远程控制', '文件传输', '观看模式', '协作模式'];
+    final tabHints = [
+      '请输入伙伴的设备代码',
+      '请输入要传输文件的设备代码',
+      '请输入要观看的设备代码',
+      '请输入要协作连接的设备代码',
+    ];
+    final tabButtons = ['连接', '传输文件', '观看', '协作连接'];
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       child: SingleChildScrollView(
@@ -4641,14 +4652,14 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                       const SizedBox(width: 12),
                       Switch(
                         value: _allowControl,
-                        activeColor: MyTheme.accent,
+                        activeColor: Theme.of(context).primaryColor,
                         onChanged: (v) => _setAllowControl(v),
                       ),
                       const SizedBox(width: 12),
                       Text(
                         '待开启二次验证保护',
                         style: TextStyle(
-                            fontSize: 12, color: Colors.orange.shade600),
+                            fontSize: 12, color: Colors.grey.shade500),
                       ),
                     ],
                   ),
@@ -4767,7 +4778,7 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                     children: [
                       Checkbox(
                         value: _requireLockPassword,
-                        activeColor: MyTheme.accent,
+                        activeColor: Theme.of(context).primaryColor,
                         onChanged: (v) {
                           if (v != null) _setRequireLockPassword(v);
                         },
@@ -4786,7 +4797,7 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                   // 远程控制设备
                   Row(
                     children: [
-                      Text('远程控制设备',
+                      Text(tabTitles[mode],
                           style: TextStyle(
                               fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 8),
@@ -4803,7 +4814,7 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                           controller: _idController,
                           focusNode: _idFocusNode,
                           decoration: InputDecoration(
-                            hintText: '请输入伙伴的设备代码',
+                            hintText: tabHints[mode],
                             filled: true,
                             fillColor: Theme.of(context)
                                 .colorScheme
@@ -4830,21 +4841,9 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8)),
                         ),
-                        child: const Text('连接', style: TextStyle(fontSize: 15)),
+                        child: Text(tabButtons[mode],
+                            style: const TextStyle(fontSize: 15)),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // 连接模式单选
-                  Row(
-                    children: [
-                      _modeRadio(0, '远程控制'),
-                      const SizedBox(width: 20),
-                      _modeRadio(1, '文件传输'),
-                      const SizedBox(width: 20),
-                      _modeRadio(2, '观看模式'),
-                      const SizedBox(width: 20),
-                      _modeRadio(3, '协作模式'),
                     ],
                   ),
                 ],
@@ -4864,7 +4863,9 @@ class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
         return Padding(
           padding: const EdgeInsets.only(right: 10),
           child: Material(
-            color: selected ? MyTheme.accent : Colors.transparent,
+            color: selected
+                ? Theme.of(context).primaryColor
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
             child: InkWell(
               onTap: () => _tabController.animateTo(index),
