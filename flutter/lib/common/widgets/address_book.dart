@@ -657,7 +657,7 @@ class _AddressBookState extends State<AddressBook> {
             ),
             if (!gFFI.abModel.current.isPersonal())
               Row(children: [
-                Icon(Icons.info, color: Colors.amber).marginOnly(right: 4),
+                Icon(Icons.info, color: Colors.grey.shade600).marginOnly(right: 4),
                 Text(
                   translate('share_warning_tip'),
                   style: TextStyle(fontSize: 12),

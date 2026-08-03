@@ -2768,7 +2768,7 @@ class _JilianDeviceListPageState extends State<_JilianDeviceListPage> {
                 _buildBigAction(Icons.folder_copy, '文件中心', const Color(0xFF1E6FFF),
                     () => _showFileCenterNotice(context)),
                 _buildBigAction(Icons.sports_esports, '游戏与应用中心',
-                    Colors.deepOrange, () => _showGameCenterNotice(context)),
+                    MyTheme.accent, () => _showGameCenterNotice(context)),
               ],
             ),
             const SizedBox(height: 24),
