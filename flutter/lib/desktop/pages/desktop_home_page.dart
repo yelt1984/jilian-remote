@@ -294,7 +294,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           // 版本号，方便用户确认当前运行的是哪个版本
           Center(
             child: Text(
-              'v29',
+              'v35',
               style: TextStyle(
                 color: Colors.grey.shade500,
                 fontSize: 11,
@@ -399,7 +399,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       child: Obx(() {
         switch (_selectedIndex.value) {
           case 0:
-            return ConnectionPage();
+            return const _JilianConnectionHomePage();
           case 1:
             return _buildDeviceListPage(context);
           case 2:
@@ -409,7 +409,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 key: const ValueKey('jilian-settings'),
                 initialTabkey: SettingsTabKey.general);
           default:
-            return ConnectionPage();
+            return const _JilianConnectionHomePage();
         }
       }),
     );
@@ -4452,6 +4452,522 @@ class _JilianScreenWallPageState extends State<_JilianScreenWallPage> {
               id: id,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ToDesk 风格连接首页：顶部 Tab + 本机设备代码/密码卡片 + 远程 ID 连接。
+class _JilianConnectionHomePage extends StatefulWidget {
+  const _JilianConnectionHomePage({Key? key}) : super(key: key);
+
+  @override
+  State<_JilianConnectionHomePage> createState() =>
+      _JilianConnectionHomePageState();
+}
+
+class _JilianConnectionHomePageState extends State<_JilianConnectionHomePage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final _idController = TextEditingController();
+  final _idFocusNode = FocusNode();
+  int _connectMode = 0; // 0=远程控制 1=文件传输 2=观看模式 3=协作模式
+  bool _allowControl = true;
+  bool _requireLockPassword = false;
+  String _password = '';
+  bool _obscurePassword = true;
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      _connectMode = _tabController.index;
+      setState(() {});
+    });
+    _initStateAsync();
+  }
+
+  Future<void> _initStateAsync() async {
+    await _syncAllowControl();
+    await _syncRequireLockPassword();
+    await _ensureServiceAndPasswordConfig();
+    await _fetchPassword();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _syncAllowControl();
+      _syncRequireLockPassword();
+      _fetchPassword();
+    });
+  }
+
+  Future<void> _syncAllowControl() async {
+    final stopped = await mainGetBoolOption(kOptionStopService);
+    if (mounted && _allowControl == stopped) {
+      setState(() => _allowControl = !stopped);
+    }
+  }
+
+  Future<void> _setAllowControl(bool allow) async {
+    setState(() => _allowControl = allow);
+    await start_service(allow);
+    if (allow) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      await _ensureServiceAndPasswordConfig();
+      bind.mainUpdateTemporaryPassword();
+      await Future.delayed(const Duration(milliseconds: 600));
+      await _fetchPassword();
+    } else {
+      if (mounted) setState(() => _password = '');
+    }
+  }
+
+  /// 强制确保服务未停止、验证方式为“所有密码”、同意模式为“密码”，
+  /// 否则 ServerModel.updatePasswordModel 会把密码显示成“-”。
+  Future<void> _ensureServiceAndPasswordConfig() async {
+    await start_service(true);
+    await mainSetBoolOption(kOptionStopService, false);
+    final method = await bind.mainGetOption(key: kOptionVerificationMethod);
+    if (method == kUsePermanentPassword || method.isEmpty) {
+      await gFFI.serverModel.setVerificationMethod(kUseBothPasswords);
+    }
+    final approveMode = await bind.mainGetOption(key: kOptionApproveMode);
+    if (approveMode == 'click' || approveMode.isEmpty) {
+      await gFFI.serverModel.setApproveMode('password');
+    }
+    await gFFI.serverModel.updatePasswordModel();
+  }
+
+  Future<void> _fetchPassword() async {
+    if (!_allowControl) return;
+    final pwd = await bind.mainGetTemporaryPassword();
+    if (mounted && _password != pwd) {
+      setState(() => _password = pwd);
+    }
+  }
+
+  Future<void> _syncRequireLockPassword() async {
+    final v = await bind.mainGetOption(key: kOptionRequireWindowsLockPassword);
+    final enabled = v == 'Y' || v == 'true';
+    if (mounted && _requireLockPassword != enabled) {
+      setState(() => _requireLockPassword = enabled);
+    }
+  }
+
+  Future<void> _setRequireLockPassword(bool value) async {
+    setState(() => _requireLockPassword = value);
+    await bind.mainSetOption(
+        key: kOptionRequireWindowsLockPassword,
+        value: value ? 'Y' : 'N');
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _tabController.dispose();
+    _idController.dispose();
+    _idFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _doConnect() {
+    final id = _idController.text.trim();
+    if (id.isEmpty) return;
+    connect(
+      context,
+      id,
+      isFileTransfer: _connectMode == 1,
+      isViewCamera: _connectMode == 2,
+      isTerminal: false,
+      isTcpTunneling: false,
+      isRDP: false,
+    );
+  }
+
+  String _formatId(String id) {
+    final digits = id.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length != 9) return id;
+    return '${digits.substring(0, 3)} ${digits.substring(3, 6)} ${digits.substring(6, 9)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          padding: const EdgeInsets.fromLTRB(28, 12, 28, 8),
+          child: _buildTopTabs(context),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: List.generate(
+              4,
+              (_) => _buildBody(context),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: ChangeNotifierProvider.value(
+          value: gFFI.serverModel,
+          child: Consumer<ServerModel>(
+            builder: (context, model, child) {
+              final idText = model.serverId.text;
+              final isGenerating = idText == translate('Generating ...');
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 允许控制本设备
+                  Row(
+                    children: [
+                      Text('允许控制本设备',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.color)),
+                      const SizedBox(width: 12),
+                      Switch(
+                        value: _allowControl,
+                        activeColor: MyTheme.accent,
+                        onChanged: (v) => _setAllowControl(v),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '待开启二次验证保护',
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.orange.shade600),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // 设备代码 + 密码卡片
+                  Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(
+                            color: Theme.of(context)
+                                .dividerColor
+                                .withOpacity(0.5))),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text('设备代码',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey.shade600)),
+                                    const SizedBox(width: 8),
+                                    Text('设备别名',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey.shade400)),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    SelectableText(
+                                      isGenerating ? '正在获取...' : _formatId(idText),
+                                      style: const TextStyle(
+                                          fontSize: 32,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    if (!isGenerating)
+                                      _iconBtn(Icons.copy, '复制', () {
+                                        Clipboard.setData(
+                                            ClipboardData(text: idText));
+                                        showToast('已复制');
+                                      }),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 70,
+                            color: Theme.of(context).dividerColor,
+                            margin: const EdgeInsets.symmetric(horizontal: 20),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text('连接模式-所有密码',
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey.shade600)),
+                                    const SizedBox(width: 4),
+                                    Icon(Icons.arrow_drop_down,
+                                        size: 18, color: Colors.grey.shade600),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    SelectableText(
+                                      _displayPassword(_password),
+                                      style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    _iconBtn(
+                                        _obscurePassword
+                                            ? Icons.visibility_off
+                                            : Icons.visibility,
+                                        _obscurePassword ? '显示密码' : '隐藏密码',
+                                        () => setState(() =>
+                                            _obscurePassword =
+                                                !_obscurePassword)),
+                                    _iconBtn(Icons.refresh, '刷新密码', () async {
+                                      bind.mainUpdateTemporaryPassword();
+                                      await Future.delayed(
+                                          const Duration(milliseconds: 500));
+                                      await _fetchPassword();
+                                    }),
+                                    _iconBtn(Icons.edit, '修改密码', () {
+                                      _showEditPasswordDialog(context);
+                                    }),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 控制本设备需校验本机锁屏密码
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _requireLockPassword,
+                        activeColor: MyTheme.accent,
+                        onChanged: (v) {
+                          if (v != null) _setRequireLockPassword(v);
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                      Text('控制本设备需校验本机锁屏密码',
+                          style: TextStyle(
+                              fontSize: 13,
+                              color: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.color)),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // 远程控制设备
+                  Row(
+                    children: [
+                      Text('远程控制设备',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 8),
+                      Text('已准备好连接',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade500)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _idController,
+                          focusNode: _idFocusNode,
+                          decoration: InputDecoration(
+                            hintText: '请输入伙伴的设备代码',
+                            filled: true,
+                            fillColor: Theme.of(context)
+                                .colorScheme
+                                .background
+                                .withOpacity(0.5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          onSubmitted: (_) => _doConnect(),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: _doConnect,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0C6AF6),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 32, vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('连接', style: TextStyle(fontSize: 15)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // 连接模式单选
+                  Row(
+                    children: [
+                      _modeRadio(0, '远程控制'),
+                      const SizedBox(width: 20),
+                      _modeRadio(1, '文件传输'),
+                      const SizedBox(width: 20),
+                      _modeRadio(2, '观看模式'),
+                      const SizedBox(width: 20),
+                      _modeRadio(3, '协作模式'),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopTabs(BuildContext context) {
+    final tabs = ['远程控制', '文件传输', '观看模式', '协作模式'];
+    return Row(
+      children: List.generate(tabs.length, (index) {
+        final selected = _tabController.index == index;
+        return Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: Material(
+            color: selected ? MyTheme.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: () => _tabController.animateTo(index),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                child: Text(
+                  tabs[index],
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: selected
+                        ? Colors.white
+                        : Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.color
+                            ?.withOpacity(0.7),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+
+  String _displayPassword(String raw) {
+    final emptyMarks = ['-', '', translate('Generating ...')];
+    if (emptyMarks.contains(raw)) return '获取中...';
+    if (_obscurePassword) return '•' * raw.length;
+    return raw;
+  }
+
+  Future<void> _showEditPasswordDialog(BuildContext context) async {
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('修改临时密码'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入新临时密码（留空则随机生成）',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('确定')),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      final value = ctrl.text.trim();
+      if (value.isNotEmpty) {
+        await bind.mainSetOption(key: 'temporary-password', value: value);
+      } else {
+        bind.mainUpdateTemporaryPassword();
+      }
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _fetchPassword();
+    }
+    ctrl.dispose();
+  }
+
+  Widget _iconBtn(IconData icon, String tooltip, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          child: Icon(icon, size: 20, color: Colors.grey.shade600),
+        ),
+      ),
+    );
+  }
+
+  Widget _modeRadio(int value, String label) {
+    final selected = _connectMode == value;
+    return InkWell(
+      onTap: () => setState(() => _connectMode = value),
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+            size: 18,
+            color: selected ? MyTheme.accent : Colors.grey.shade500,
+          ),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: selected
+                      ? MyTheme.accent
+                      : Theme.of(context).textTheme.titleMedium?.color)),
         ],
       ),
     );

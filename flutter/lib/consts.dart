@@ -202,6 +202,10 @@ const String kOptionRemovePresetPasswordWarning =
 const String kOptionDisableChangePermanentPassword =
     "disable-change-permanent-password";
 const String kOptionDisableChangeId = "disable-change-id";
+
+// jilian custom options
+const String kOptionRequireWindowsLockPassword =
+    "require-windows-lock-password";
 const String kOptionDisableUnlockPin = "disable-unlock-pin";
 const kHideUsernameOnCard = "hide-username-on-card";
 const String kOptionHideHelpCards = "hide-help-cards";
