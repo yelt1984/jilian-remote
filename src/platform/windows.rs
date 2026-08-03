@@ -3793,9 +3793,17 @@ sc start {app_name}
 }
 
 fn run_after_run_cmds(silent: bool) {
-    let (_, _, _, exe) = get_install_info();
+    // [极连远程] 强制用当前进程 exe 路径启动托盘/新窗口，
+    // 不再用 get_install_info() —— 否则会去拉起系统里残留的官方 rustdesk.exe。
+    let exe = std::env::current_exe()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|_| {
+            // 兜底：如果 current_exe() 失败，再用 get_install_info() 的路径
+            let (_, _, _, exe) = get_install_info();
+            exe
+        });
     if !silent {
-        log::debug!("Spawn new window");
+        log::debug!("Spawn new window (jilian: using current_exe)");
         allow_err!(std::process::Command::new("cmd")
             .args(&["/c", "timeout", "/t", "2", "&", &format!("{exe}")])
             .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
