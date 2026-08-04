@@ -475,6 +475,7 @@ class MyTheme {
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: MyTheme.accent,
+        foregroundColor: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8.0),
         ),
@@ -3052,13 +3053,19 @@ Widget dialogButton(String text,
     } else {
       return icon == null
           ? ElevatedButton(
-              style: ElevatedButton.styleFrom(elevation: 0).merge(buttonStyle),
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                foregroundColor: Colors.white,
+              ).merge(buttonStyle),
               onPressed: onPressed,
               child: Text(translate(text), style: style),
             )
           : ElevatedButton.icon(
               icon: icon,
-              style: ElevatedButton.styleFrom(elevation: 0).merge(buttonStyle),
+              style: ElevatedButton.styleFrom(
+                elevation: 0,
+                foregroundColor: Colors.white,
+              ).merge(buttonStyle),
               onPressed: onPressed,
               label: Text(translate(text), style: style),
             );

@@ -198,6 +198,15 @@ jobs:
           cd $(dirname $(dirname $(which flutter)))
           [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply flutter_3.24.4_dropdown_menu_enableFilter.diff
 
+      - name: Patch yellow underline in Flutter _errorTextStyle (jilian-remote)
+        # 极连远程：Flutter SDK 的 _errorTextStyle 默认带黄色双下划线，会让无 Material 祖先的
+        # Text 继承诡异黄线。本地 SDK 已改，云端用全新 SDK 必须在此补丁根治，否则黄线回潮。
+        if: ${{ matrix.job.arch == 'x86_64' }}
+        shell: bash
+        run: |
+          SDK_ROOT=$(dirname $(dirname $(which flutter)))
+          python3 .github/patches/fix_error_text_style.py "$SDK_ROOT/packages/flutter/lib/src/material/app.dart"
+
       - name: Patch RustDesk sources for Flutter 3.44 (arm64)
         # arm64 is the only target on Flutter 3.44; apply its source/pubspec deltas on the fly
         # (shared with the 3.44 bridge job) so the committed sources stay on Flutter 3.24.5.
@@ -568,6 +577,12 @@ jobs:
         run: |
           cd $(dirname $(dirname $(which flutter)))
           [[ "3.24.5" == ${{env.FLUTTER_VERSION}} ]] && git apply ${{ github.workspace }}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff
+
+      - name: Patch yellow underline in Flutter _errorTextStyle (jilian-remote)
+        shell: bash
+        run: |
+          SDK_ROOT=$(dirname $(dirname $(which flutter)))
+          python3 ${{ github.workspace }}/.github/patches/fix_error_text_style.py "$SDK_ROOT/packages/flutter/lib/src/material/app.dart"
 
       - name: Setup vcpkg with Github Actions binary cache
         uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
