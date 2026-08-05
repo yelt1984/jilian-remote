@@ -1,0 +1,17 @@
+# 机密 / 运行数据 —— 绝不进版本库
+.env
+*.db
+*.sqlite
+*.sqlite3
+
+# 依赖
+node_modules/
+
+# 日志
+*.log
+npm-debug.log*
+
+# 系统 / 编辑器
+.DS_Store
+.idea/
+.vscode/
