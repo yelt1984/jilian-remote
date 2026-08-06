@@ -1,8 +1,10 @@
 const express = require('express');
 const auth = require('../middleware/auth');
 const db = require('../db');
-// 极连远程 V72：心跳异步反查对端真实 IP + 地区，写回数据库
-const { extractClientIp, lookupRegion } = require('../utils/ip-region');
+// 极连远程 V72/V80.1：心跳异步反查对端真实 IP + 地区，写回数据库
+// V80.1：region 改走本地离线库（ip2region），国内服务器免外网依赖；
+//      同时把 IP 写库从 region 查询中分离，IP 总是写，region 尽力写。
+const { extractClientIp, lookupRegion, lookupRegionLocal } = require('../utils/ip-region');
 const router = express.Router();
 
 router.use(auth);
@@ -132,22 +134,29 @@ router.post('/heartbeat', async (req, res) => {
     );
     res.json({ code: 0, msg: 'ok' });
 
-    // 极连远程 V72：异步反查对端真实 IP + 地区，写回数据库。
-    // 1) 不阻塞响应（先 res.json 再异步）；2) 私网/空 IP/查询失败一律静默跳过；
-    // 3) 工具模块内置 30 分钟缓存，同 IP 不会重复打 ip-api.com；
-    // 4) 只在拿到非空 region/ip 时才写库，避免空串覆盖已有值。
+    // 极连远程 V80.1：异步反查对端 IP + 地区，写回数据库。
+    // 1) IP 写库与 region 解耦 —— IP 总是写（不再因 region 查询失败被连带跳过）；
+    // 2) region 走本地离线库（ip2region），零外网依赖，国内服务器也能查；
+    // 3) 私网/空 IP 静默跳过；只会用非空值覆盖现有值，不空写；
+    // 4) 两个写入都是 fire-and-forget，不阻塞响应。
     const ip = extractClientIp(req);
     if (!ip) return;
-    lookupRegion(ip).then(async (info) => {
+    // IP 独立写库
+    db.run(
+      'UPDATE devices SET ip = ? WHERE user_id = ? AND device_id = ? AND (ip IS NULL OR ip = ?)',
+      [ip, req.userId, deviceId, '']
+    ).catch((e) => console.error('V80.1 回写 IP 失败:', e.message));
+    // region 走离线库反查
+    Promise.resolve(lookupRegionLocal(ip)).then(async (info) => {
       if (!info || !info.region) return;
       try {
         await db.run(
-          'UPDATE devices SET ip = ?, region = ? WHERE user_id = ? AND device_id = ?',
-          [info.ip, info.region, req.userId, deviceId]
+          'UPDATE devices SET region = ? WHERE user_id = ? AND device_id = ? AND (region IS NULL OR region = ?)',
+          [info.region, req.userId, deviceId, '']
         );
-        console.log(`V72 心跳回写 ${deviceId} -> ${info.ip} ${info.region}`);
+        console.log(`V80.1 心跳回写 ${deviceId} -> ${ip} ${info.region}`);
       } catch (e) {
-        console.error('V72 回写地区失败:', e.message);
+        console.error('V80.1 回写地区失败:', e.message);
       }
     });
   } catch (err) {

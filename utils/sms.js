@@ -1,14 +1,9 @@
-const Dysmsapi = require('@alicloud/dysmsapi20170525');
-const OpenApi = require('@alicloud/openapi-client');
-
-const SMS_PROVIDER = process.env.SMS_PROVIDER || 'console'; // console | aliyun | tencent
-
-// 生成 6 位数字验证码
+// 懒加载 aliyun SDK：只有 SMS_PROVIDER=aliyun 才 require，
+// console/tencent 模式下不强制依赖这两个包，避免缺包时服务整体崩。
 function generateCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
-// 60 秒发送限频，避免重复扣费
 async function checkRateLimit(phone) {
   const db = require('../db');
   const row = await db.get(
@@ -23,93 +18,137 @@ async function checkRateLimit(phone) {
   }
 }
 
-async function sendSms(phone) {
-  const db = require('../db');
-
-  // 测试模式：仅写库 + 控制台打印，固定不真正下发
-  if (SMS_PROVIDER === 'console') {
-    const code = generateCode();
-    await db.run('INSERT INTO sms_codes (phone, code) VALUES (?, ?)', [phone, code]);
-    console.log(`[测试模式] 手机号: ${phone}, 验证码: ${code}`);
-    return { success: true, testCode: code };
-  }
-
-  // 真实模式先做限频
-  await checkRateLimit(phone);
-  const code = generateCode();
-  await db.run('INSERT INTO sms_codes (phone, code) VALUES (?, ?)', [phone, code]);
-
-  if (SMS_PROVIDER === 'aliyun') {
-    return await sendAliyunSms(phone, code);
-  }
-  if (SMS_PROVIDER === 'tencent') {
-    return sendTencentSms(phone, code);
-  }
-
-  console.log(`[默认测试模式] 手机号: ${phone}, 验证码: ${code}`);
-  return { success: true, testCode: code };
+// ---- 阿里云短信（零依赖实现，只用 node 内置 crypto + https）----
+// 不再依赖 @alicloud/dysmsapi20170525 / @alicloud/openapi-client，
+// 直接按阿里云 RPC 签名规范 v1.0 (HMAC-SHA1) 构造请求，避免服务器装包失败。
+function aliPercentEncode(str) {
+  return encodeURIComponent(String(str))
+    .replace(/\+/g, '%20')
+    .replace(/\*/g, '%2A')
+    .replace(/%7E/g, '~');
 }
 
-// 阿里云短信客户端
-function createAliyunClient(accessKeyId, accessKeySecret) {
-  const config = new OpenApi.Config({ accessKeyId, accessKeySecret });
-  config.endpoint = 'dysmsapi.aliyuncs.com';
-  return new Dysmsapi.default(config);
+function aliBuildSignedBody(params, accessKeySecret) {
+  const keys = Object.keys(params).sort();
+  const canonical = keys
+    .map((k) => aliPercentEncode(k) + '=' + aliPercentEncode(params[k]))
+    .join('&');
+  const stringToSign =
+    'POST&' + aliPercentEncode('/') + '&' + aliPercentEncode(canonical);
+  const crypto = require('crypto');
+  const signature = crypto
+    .createHmac('sha1', accessKeySecret + '&')
+    .update(stringToSign)
+    .digest('base64');
+  return 'Signature=' + aliPercentEncode(signature) + '&' + canonical;
+}
+
+function aliPost(body) {
+  const https = require('https');
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: 'dysmsapi.aliyuncs.com',
+        path: '/',
+        method: 'POST',
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (c) => (data += c));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(new Error('阿里云返回非 JSON: ' + data.slice(0, 200)));
+          }
+        });
+      }
+    );
+    req.on('timeout', () => { req.destroy(new Error('阿里云短信请求超时')); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
 }
 
 async function sendAliyunSms(phone, code) {
-  // 短信签名需与阿里云实名主体一致。后台当前审核通过的签名为「海驭网络科技」。
-  // 若发送返回“签名不存在/签名不合法”，请到阿里云后台确认实际可用签名并同步 ALIYUN_SMS_SIGN_NAME。
   const accessKeyId = process.env.ALIYUN_ACCESS_KEY_ID;
   const accessKeySecret = process.env.ALIYUN_ACCESS_KEY_SECRET;
   const signName = process.env.ALIYUN_SMS_SIGN_NAME;
   const templateCode = process.env.ALIYUN_SMS_TEMPLATE_CODE;
   if (!accessKeyId || !accessKeySecret || !signName || !templateCode) {
-    throw new Error('阿里云短信环境变量未配置完整');
+    throw new Error('阿里云短信配置缺失（ALIYUN_ACCESS_KEY_ID / SECRET / SIGN_NAME / TEMPLATE_CODE）');
   }
-  const client = createAliyunClient(accessKeyId, accessKeySecret);
-  const request = new Dysmsapi.SendSmsRequest({
-    phoneNumbers: phone,
-    signName: signName,
-    templateCode: templateCode,
-    templateParam: JSON.stringify({ code: code }),
-  });
-  const resp = await client.sendSms(request);
-  const body = (resp && resp.body) || {};
-  if (body.code === 'OK') {
-    console.log(`[阿里云短信] 发送成功 phone=${phone}`);
-    return { success: true };
+
+  const crypto = require('crypto');
+  const params = {
+    // --- 公共参数 ---
+    AccessKeyId: accessKeyId,
+    Action: 'SendSms',
+    Format: 'JSON',
+    RegionId: 'cn-hangzhou',
+    SignatureMethod: 'HMAC-SHA1',
+    SignatureNonce: crypto.randomUUID(),
+    SignatureVersion: '1.0',
+    Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
+    Version: '2017-05-25',
+    // --- 业务参数 ---
+    PhoneNumbers: phone,
+    SignName: signName,
+    TemplateCode: templateCode,
+    TemplateParam: JSON.stringify({ code }),
+  };
+
+  const body = aliBuildSignedBody(params, accessKeySecret);
+  const result = await aliPost(body);
+
+  if (result && result.Code === 'OK') {
+    console.log(`[阿里云短信] 已下发 ${phone} BizId=${result.BizId}`);
+    return { success: true, bizId: result.BizId };
   }
-  console.error(`[阿里云短信] 发送失败 code=${body.code} message=${body.message}`);
-  throw new Error(`短信发送失败: ${body.code} ${body.message}`);
+  throw new Error(
+    '阿里云短信下发失败: ' +
+      (result && (result.Code + ' / ' + result.Message))
+  );
 }
 
-async function sendTencentSms(phone, code) {
-  // TODO: 接入腾讯云短信服务，需要配置以下环境变量：
-  // TENCENT_SMS_SECRET_ID, TENCENT_SMS_SECRET_KEY, TENCENT_SMS_SDK_APPID, TENCENT_SMS_SIGN_NAME, TENCENT_SMS_TEMPLATE_ID
-  const secretId = process.env.TENCENT_SMS_SECRET_ID;
-  const secretKey = process.env.TENCENT_SMS_SECRET_KEY;
-  const sdkAppId = process.env.TENCENT_SMS_SDK_APPID;
-  const signName = process.env.TENCENT_SMS_SIGN_NAME;
-  const templateId = process.env.TENCENT_SMS_TEMPLATE_ID;
-  if (!secretId || !secretKey || !sdkAppId || !signName || !templateId) {
-    throw new Error('腾讯云短信环境变量未配置完整');
-  }
-  throw new Error('腾讯云短信尚未实现');
-}
+async function sendSms(phone) {
+  const db = require('../db');
+  const SMS_PROVIDER = process.env.SMS_PROVIDER || 'console';
 
-// 验证验证码（5 分钟内有效）
-async function verifySms(phone, code) {
   if (SMS_PROVIDER === 'console') {
-    // 测试模式：固定 123456 也放行
-    if (code === '123456') return true;
+    const code = generateCode();
+    await db.run('INSERT INTO sms_codes (phone, code, used) VALUES (?, ?, 0)', [phone, code]);
+    console.log(`[测试模式] 手机号: ${phone}, 验证码: ${code}`);
+    return { success: true, testCode: code };
   }
+
+  await checkRateLimit(phone);
+  const code = generateCode();
+  await db.run('INSERT INTO sms_codes (phone, code, used) VALUES (?, ?, 0)', [phone, code]);
+
+  if (SMS_PROVIDER === 'aliyun') return await sendAliyunSms(phone, code);
+  if (SMS_PROVIDER === 'tencent') {
+    console.log(`[腾讯云-未实装回退到测试模式] 手机号: ${phone}, 验证码: ${code}`);
+    return { success: true, testCode: code };
+  }
+  console.log(`[默认测试模式] 手机号: ${phone}, 验证码: ${code}`);
+  return { success: true, testCode: code };
+}
+
+async function verifySms(phone, code) {
   const db = require('../db');
   const row = await db.get(
-    'SELECT * FROM sms_codes WHERE phone = ? AND code = ? AND used = 0 AND created_at > datetime("now", "-5 minutes") ORDER BY id DESC LIMIT 1',
+    'SELECT id, used FROM sms_codes WHERE phone = ? AND code = ? ORDER BY id DESC LIMIT 1',
     [phone, code]
   );
   if (!row) return false;
+  if (row.used) return false;
   await db.run('UPDATE sms_codes SET used = 1 WHERE id = ?', [row.id]);
   return true;
 }

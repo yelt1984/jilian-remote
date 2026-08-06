@@ -94,9 +94,48 @@ async function lookupRegion(ip) {
   return fresh;
 }
 
+// ===== 极连远程 V80.1：本地离线 IP→地区（替代 ip-api.com，国内服务器免外网依赖） =====
+// 数据源：node-ip2region（自带 data/ip2region.db，纯本地文件，零外网）。
+// search(ip) 返回 { country, province, city, isp }。
+let _ip2region = null;
+function getIp2region() {
+  if (_ip2region !== null) return _ip2region; // false 表示加载失败，缓存避免反复 require
+  try {
+    const mod = require('ip2region');
+    const IP2Region = (mod && mod.default) || mod;
+    _ip2region = new IP2Region();
+  } catch (e) {
+    console.error('V80.1 加载 ip2region 失败:', e.message);
+    _ip2region = false;
+  }
+  return _ip2region;
+}
+
+/**
+ * 离线库反查地区（纯本地数据文件，零外网）。
+ * 失败 / 私网 / 非法 IP 返回 null，调用方据此跳过。
+ * 返回 { ip, region }，region 精简为 "省 市"，避免列表行过长。
+ */
+function lookupRegionLocal(ip) {
+  if (!ip || !isValidPublicIpv4(ip) || isPrivateIp(ip)) return null;
+  const q = getIp2region();
+  if (!q) return null;
+  try {
+    const r = q.search(ip);
+    if (!r) return null;
+    const parts = [r.province, r.city].filter(Boolean);
+    if (parts.length === 0) return null;
+    return { ip, region: parts.join(' ') };
+  } catch (e) {
+    console.error('V80.1 ip2region 查地区失败:', ip, e.message);
+    return null;
+  }
+}
+
 module.exports = {
   extractClientIp,
   lookupRegion,
+  lookupRegionLocal,
   isPrivateIp,
   // 暴露给测试用
   _normalizeIp: normalizeIp,
